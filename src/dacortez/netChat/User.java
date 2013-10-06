@@ -1,10 +1,15 @@
 package dacortez.netChat;
 
+import java.nio.channels.Channel;
+
 public class User {
 	private String name;
 	private String userName;
 	private String passwordHash;
 	private String host = null;
+	private int port;
+	private ConnectionType type;
+	private Channel channel;
 	
 	public String getName() {
 		return name;
@@ -37,6 +42,30 @@ public class User {
 	public void setHost(String host) {
 		this.host = host;
 	}
+	
+	public int getPort() {
+		return port;
+	}
+
+	public void setPort(int port) {
+		this.port = port;
+	}
+
+	public ConnectionType getType() {
+		return type;
+	}
+
+	public void setType(ConnectionType type) {
+		this.type = type;
+	}
+
+	public Channel getChannel() {
+		return channel;
+	}
+
+	public void setChannel(Channel channel) {
+		this.channel = channel;
+	}
 
 	public User(String name, String userName, String passwordHash) {
 		this.name = name;
@@ -54,6 +83,6 @@ public class User {
 	
 	@Override
 	public String toString() {
-		return name + " (" + userName + ")" + " from [" + host + "]";
+		return name + " (" + userName + ")" + " from [" + host + "]: " + type;
 	}
 }

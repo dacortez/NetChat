@@ -1,14 +1,10 @@
 package dacortez.netChat;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
+import java.nio.channels.Channel;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,31 +32,15 @@ public class Server extends Multiplex {
 	
 	@Override
 	protected void registerChannelsWithSelector() throws IOException {
-		setServerSocketChannel();
+		setServerSocketChannel(port);
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-		System.out.println("Listening TCP on port " + port);
+		System.out.println("Server listening TCP on port " + port);
 		
-		setDatagramChannel();
+		setDatagramChannel(port);
 		datagramChannel.register(selector, SelectionKey.OP_READ);
-		System.out.println("Listening UDP on port " + port);
+		System.out.println("Server listening UDP on port " + port);
 	}
 	
-	private void setServerSocketChannel() throws IOException {
-		serverSocketChannel = ServerSocketChannel.open();
-		serverSocketChannel.configureBlocking(false);
-		ServerSocket serverSocket = serverSocketChannel.socket();
-		InetSocketAddress isa = new InetSocketAddress(port);
-		serverSocket.bind(isa);
-	}
-	
-	private void setDatagramChannel() throws IOException {
-		datagramChannel = DatagramChannel.open();
-		datagramChannel.configureBlocking(false);
-		DatagramSocket datagramSocket = datagramChannel.socket();
-		InetSocketAddress isa = new InetSocketAddress(port);
-		datagramSocket.bind(isa);
-	}
-
 	@Override
 	protected void respondTCP(SocketChannel channel) throws IOException {
 		ProtocolData received = new ProtocolData(buffer);
@@ -68,11 +48,13 @@ public class Server extends Multiplex {
 			sendTCP(received, channel);
 		}
 		else if (received.getType() == DataType.LOGIN_REQUEST) {
-			InetAddress inet = channel.socket().getInetAddress();
-			if (logInUser(received, inet.getHostName()))			
+			if (logInUser(received, channel))			
 				sendTCP(new ProtocolData(DataType.LOGIN_OK), channel);
 			else
 				sendTCP(new ProtocolData(DataType.LOGIN_FAIL), channel);
+		}
+		else if (received.getType() == DataType.HEART_BEAT) {
+			System.out.println(received);
 		}
 		else if (received.getType() == DataType.USERS_REQUEST) {
 			ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
@@ -96,13 +78,17 @@ public class Server extends Multiplex {
 		// Nothing to do here.
 	}
 
-	private boolean logInUser(ProtocolData loginInfo, String host) {
+	private boolean logInUser(ProtocolData loginInfo, Channel channel) {
 		String userName = loginInfo.getHeaderLine(0);
 		String password = loginInfo.getHeaderLine(1);
 		for (User user: allUsers)
 			if (user.hasUserName(userName) && user.authenticate(password)) {
 				// TODO Falta verificar se o usuário já está logado.
-				user.setHost(host);
+				SocketChannel socket = (SocketChannel) channel;
+				user.setType(ConnectionType.TCP);
+				user.setChannel(channel);
+				user.setPort(socket.socket().getPort());
+				user.setHost(socket.socket().getInetAddress().getHostName());
 				loggedInUsers.add(user);
 				return true;
 			}

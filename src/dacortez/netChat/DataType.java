@@ -9,7 +9,8 @@ public enum DataType {
 	USERS_REQUEST("USER/REQUEST"), 
 	USERS_LIST("USERS/LIST"),
 	LOGOUT_REQUEST("LOGOUT/REQUEST"),
-	LOGOUT_OK("LOGOUT/OK");
+	LOGOUT_OK("LOGOUT/OK"),
+	HEART_BEAT("HEART/BEAT");
 	
 	private final String value;
 	

@@ -1,6 +1,9 @@
 package dacortez.netChat;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -12,19 +15,24 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
+import java.util.Timer;
 
 public abstract class Multiplex {
 	protected final ByteBuffer buffer = ByteBuffer.allocate(16384);
+	protected SystemInPipe stdinPipe;
 	protected Selector selector;
 	protected ServerSocketChannel serverSocketChannel;
 	protected DatagramChannel datagramChannel;
 	protected SelectableChannel stdin;
+	protected Timer timer = new Timer();
 	
 	public void run() {
 		try {
 			selector = Selector.open();
 			registerChannelsWithSelector();
+			setTimer();
 			while (true) {
+				if (!selector.isOpen()) break;
 				int readyChannels = selector.select();
 				if (readyChannels == 0) continue;
 				Set<SelectionKey> keys = selector.selectedKeys();
@@ -35,10 +43,50 @@ public abstract class Multiplex {
 		} catch (IOException ie) {
 			System.err.println(ie);
 		}
+		closeChannels();
+	}
+	
+	protected void setTimer() {
+		// Nothing to do here.
 	}
 	
 	protected abstract void registerChannelsWithSelector() throws IOException;
 	
+	private void closeChannels() {
+		try {
+			if (serverSocketChannel != null && serverSocketChannel.isOpen())
+				serverSocketChannel.close();
+			if (datagramChannel != null && datagramChannel.isOpen())
+				datagramChannel.close();
+			if (stdin != null && stdin.isOpen())
+				stdin.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}	
+	}
+	
+	protected void setServerSocketChannel(int port) throws IOException {
+		serverSocketChannel = ServerSocketChannel.open();
+		serverSocketChannel.configureBlocking(false);
+		ServerSocket serverSocket = serverSocketChannel.socket();
+		InetSocketAddress isa = new InetSocketAddress(port);
+		serverSocket.bind(isa);
+	}
+	
+	protected void setDatagramChannel(int port) throws IOException {
+		datagramChannel = DatagramChannel.open();
+		datagramChannel.configureBlocking(false);
+		DatagramSocket datagramSocket = datagramChannel.socket();
+		InetSocketAddress isa = new InetSocketAddress(port);
+		datagramSocket.bind(isa);
+	}
+	
+	protected void setSelectableChannel() throws IOException {
+		stdinPipe = new SystemInPipe();
+		stdin = stdinPipe.getStdinChannel();
+		stdin.configureBlocking(false);
+	}
+
 	private void handleReadyChannel(SelectionKey selectionKey) {
 		if (selectionKey.isAcceptable())
 			handleAcceptable();
@@ -50,9 +98,9 @@ public abstract class Multiplex {
 		Socket socket = null;
 		try {
 			socket = serverSocketChannel.socket().accept();
-			SocketChannel socketChannel = socket.getChannel();
-			socketChannel.configureBlocking(false);
-			socketChannel.register(selector, SelectionKey.OP_READ);
+			SocketChannel channel = socket.getChannel();
+			channel.configureBlocking(false);
+			channel.register(selector, SelectionKey.OP_READ);
 			System.out.println("Got TCP connection from " + socket);
 		} catch (IOException e) {
 			System.err.println("Error on accepting connection " + socket);
@@ -108,7 +156,7 @@ public abstract class Multiplex {
 		channel.read(buffer);
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
-		System.out.println("Read " + buffer.limit() + " from TCP " + channel);
+		//System.out.println("Read " + buffer.limit() + " from TCP " + channel);
 		return true;
 	}
 	
@@ -117,7 +165,7 @@ public abstract class Multiplex {
 		channel.receive(buffer);
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
-		System.out.println("Processed " + buffer.limit() + " from UDP " + channel);
+		//System.out.println("Processed " + buffer.limit() + " from UDP " + channel);
 		return true;
 	}
 
@@ -126,7 +174,7 @@ public abstract class Multiplex {
         int count = channel.read(buffer);
         if (count < 0) return false;
         buffer.flip();
-        System.out.println ("Processed " + count + " from Stdin " + channel);
+        //System.out.println ("Processed " + count + " from Stdin " + channel);
 		return true;
 	}
 	
@@ -159,12 +207,12 @@ public abstract class Multiplex {
 		} catch (IOException ie) {
 			System.err.println("Error closing channel " + channel + ": " + ie);
 		}
-		System.out.println("Closed " + channel);
+		//System.out.println("Closed " + channel);
 	}
 	
 	protected void sendTCP(ProtocolData data, SocketChannel channel) throws IOException {
 		ByteBuffer buffer = data.toByteBuffer();
 		channel.write(buffer);
-		System.out.println("Sent " + buffer.limit() + " from " + channel);
+		//System.out.println("Sent " + buffer.limit() + " from " + channel);
 	}
 }
