@@ -1,7 +1,5 @@
 package dacortez.netChat;
 
-import java.nio.channels.Channel;
-
 public class User {
 	private String name;
 	private String userName;
@@ -9,7 +7,6 @@ public class User {
 	private String host = null;
 	private int port;
 	private ConnectionType type;
-	private Channel channel;
 	private boolean locked;
 	private Integer clientPort;
 	
@@ -59,14 +56,6 @@ public class User {
 
 	public void setType(ConnectionType type) {
 		this.type = type;
-	}
-
-	public Channel getChannel() {
-		return channel;
-	}
-
-	public void setChannel(Channel channel) {
-		this.channel = channel;
 	}
 
 	public boolean isLocked() {

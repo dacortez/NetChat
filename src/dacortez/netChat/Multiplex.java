@@ -46,24 +46,9 @@ public abstract class Multiplex {
 		closeChannels();
 	}
 	
-	protected void setTimer() {
-		// Nothing to do here.
-	}
+	protected abstract void setTimer();
 	
 	protected abstract void registerChannelsWithSelector() throws IOException;
-	
-	private void closeChannels() {
-		try {
-			if (serverSocketChannel != null && serverSocketChannel.isOpen())
-				serverSocketChannel.close();
-			if (datagramChannel != null && datagramChannel.isOpen())
-				datagramChannel.close();
-			if (stdin != null && stdin.isOpen())
-				stdin.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}	
-	}
 	
 	protected void setServerSocketChannel(int port) throws IOException {
 		serverSocketChannel = ServerSocketChannel.open();
@@ -86,7 +71,20 @@ public abstract class Multiplex {
 		stdin = stdinPipe.getStdinChannel();
 		stdin.configureBlocking(false);
 	}
-
+	
+	private void closeChannels() {
+		try {
+			if (serverSocketChannel != null && serverSocketChannel.isOpen())
+				serverSocketChannel.close();
+			if (datagramChannel != null && datagramChannel.isOpen())
+				datagramChannel.close();
+			if (stdin != null && stdin.isOpen())
+				stdin.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}	
+	}
+	
 	private void handleReadyChannel(SelectionKey selectionKey) {
 		if (selectionKey.isAcceptable())
 			handleAcceptable();
@@ -101,7 +99,7 @@ public abstract class Multiplex {
 			SocketChannel channel = socket.getChannel();
 			channel.configureBlocking(false);
 			channel.register(selector, SelectionKey.OP_READ);
-			System.out.println("Got TCP connection from " + socket);
+			//System.out.println("Got TCP connection from " + socket);
 		} catch (IOException e) {
 			System.err.println("Error on accepting connection " + socket);
 		}
@@ -109,14 +107,14 @@ public abstract class Multiplex {
 	
 	private void handleReadable(SelectionKey key) {
 		if (key.channel() instanceof SocketChannel)
-			handleTCP(key);
+			handleReadableTCP(key);
 		else if (key.channel() instanceof DatagramChannel)
-			handleUDP(key);
+			handleReadableUDP(key);
 		else
-			handleStdin(key);
+			handleReadableStdin(key);
 	}
 	
-	private void handleTCP(SelectionKey key) {
+	private void handleReadableTCP(SelectionKey key) {
 		SocketChannel socketChannel = null;
 		try {
 			socketChannel = (SocketChannel) key.channel();
@@ -129,7 +127,7 @@ public abstract class Multiplex {
 		}
 	}
 	
-	private void handleUDP(SelectionKey key) {
+	private void handleReadableUDP(SelectionKey key) {
 		DatagramChannel datagramChannel = null;
 		try {
 			datagramChannel = (DatagramChannel) key.channel();
@@ -140,7 +138,7 @@ public abstract class Multiplex {
 		}
 	}
 	
-	private void handleStdin(SelectionKey key) {
+	private void handleReadableStdin(SelectionKey key) {
 		ReadableByteChannel channel = null;
 		try {
 			channel = (ReadableByteChannel) key.channel();
@@ -197,7 +195,7 @@ public abstract class Multiplex {
 		} catch (IOException ie) {
 			System.err.println("Error closing socket " + socket + ": " + ie);
 		}
-		System.out.println("Closed " + socket);
+		//System.out.println("Closed " + socket);
 	}
 	
 	protected void closeChannel(SelectionKey key, Channel channel) {

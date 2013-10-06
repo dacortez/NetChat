@@ -31,13 +31,17 @@ public class Server extends Multiplex {
 	}
 	
 	@Override
+	protected void setTimer() {
+		// Nothing to do here.
+	}
+	
+	@Override
 	protected void registerChannelsWithSelector() throws IOException {
 		setServerSocketChannel(port);
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-		System.out.println("Server listening TCP on port " + port);
-		
 		setDatagramChannel(port);
 		datagramChannel.register(selector, SelectionKey.OP_READ);
+		System.out.println("Server listening TCP on port " + port);
 		System.out.println("Server listening UDP on port " + port);
 	}
 	
@@ -87,8 +91,9 @@ public class Server extends Multiplex {
 
 	private void chatRequest(SocketChannel channel, ProtocolData received) throws IOException {
 		User requested = getLoggedUser(received.getHeaderLine(0));
+		User sender = getLoggedUser(received.getHeaderLine(1));
 		if (requested != null)
-			checkConnectionAndLock(channel, requested);
+			checkConnectionAndLock(channel, requested, sender);
 		else {
 			ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
 			chatDenied.addToHeader("usuario nao conectado");
@@ -96,11 +101,13 @@ public class Server extends Multiplex {
 		}
 	}
 
-	private void checkConnectionAndLock(SocketChannel channel, User requested) throws IOException {
+	private void checkConnectionAndLock(SocketChannel channel, User requested, User sender) throws IOException {
 		ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
 		if (requested.getType() == ConnectionType.TCP) {
 			if (!requested.isLocked()) {
-				sendChatOK(requested, channel);
+				requested.setLocked(true); 
+				sender.setLocked(true);
+				sendChatOK(channel, requested, sender);
 			}
 			else {
 				chatDenied.addToHeader("usuario bloqueado");
@@ -113,10 +120,12 @@ public class Server extends Multiplex {
 		}
 	}
 
-	private void sendChatOK(User requested, SocketChannel channel) throws IOException {
+	private void sendChatOK(SocketChannel channel, User requested, User sender) throws IOException {
 		ProtocolData chatOK = new ProtocolData(DataType.CHAT_OK);
 		chatOK.addToHeader(requested.getHost());
 		chatOK.addToHeader(requested.getClientPort().toString());
+		chatOK.addToHeader(sender.getHost());
+		chatOK.addToHeader(sender.getClientPort().toString());
 		sendTCP(chatOK, channel);
 	}
 	
@@ -144,17 +153,20 @@ public class Server extends Multiplex {
 		for (User user: allUsers)
 			if (user.hasUserName(userName) && user.authenticate(password)) {
 				// TODO Falta verificar se o usuário já está logado.
-				SocketChannel socket = (SocketChannel) channel;
-				user.setType(ConnectionType.TCP);
-				user.setChannel(channel);
-				user.setPort(socket.socket().getPort());
-				user.setHost(socket.socket().getInetAddress().getHostName());
-				user.setClientPort(Integer.parseInt(clientPort));
-				user.setLocked(false);
+				setLoggedInUser(channel, clientPort, user);
 				loggedInUsers.add(user);
 				return true;
 			}
 		return false;
+	}
+
+	private void setLoggedInUser(Channel channel, String clientPort, User user) {
+		SocketChannel socket = (SocketChannel) channel;
+		user.setType(ConnectionType.TCP);
+		user.setPort(socket.socket().getPort());
+		user.setHost(socket.socket().getInetAddress().getHostName());
+		user.setClientPort(Integer.parseInt(clientPort));
+		user.setLocked(false);
 	}
 	
 	private void logOutUser(String userName) {

@@ -178,6 +178,8 @@ public class ProtocolData {
 			return DataType.CHAT_OK;
 		if (value.contentEquals(DataType.CHAT_DENIED.toString()))
 			return DataType.CHAT_DENIED;
+		if (value.contentEquals(DataType.CHAT_MSG.toString()))
+			return DataType.CHAT_MSG;
 		if (value.contentEquals(DataType.HEART_BEAT.toString()))
 			return DataType.HEART_BEAT;
 		return null;

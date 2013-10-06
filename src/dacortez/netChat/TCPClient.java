@@ -1,43 +1,15 @@
 package dacortez.netChat;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 public class TCPClient extends Client {
-	private Socket socket;
 	
-	public TCPClient(String host, int port, int clientPort) {
+	public TCPClient(String host, int port, int clientPort) throws IOException {
 		super(host, port, clientPort);
-	}
-	
-	@Override
-	protected void start() throws IOException {
-		socket = new Socket(host, port);
-		ProtocolData tcpOK = new ProtocolData(DataType.TCP_OK);
-		sendToServer(tcpOK);
-		if (receiveFromServer().getType() == DataType.TCP_OK)
-			doLogin();
-		socket.close();		
-	}
-	
-	@Override
-	protected void sendToServer(ProtocolData data) throws IOException {
-		byte[] array = data.toByteArray();
-		DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-		out.write(array);
-		//System.out.println("Sent " + array.length + " from " + socket);
-	}
-	
-	@Override
-	protected ProtocolData receiveFromServer() throws IOException {
-		int length = socket.getInputStream().read(serverBuffer);
-		ProtocolData protocolData = new ProtocolData(serverBuffer, length); 
-		//System.out.println("Read " + length + " from " + socket);
-		return protocolData;
+		serverPipe = new TCPPipe(host, port);
 	}
 	
 	@Override
@@ -50,10 +22,35 @@ public class TCPClient extends Client {
 		stdinPipe.start();
 		//System.out.println("TCPClient listening stdin");
 	}
+	
+	@Override
+	protected void p2pInstantiation(String host, Integer port) throws IOException {
+		p2pPipe = new TCPPipe(host, port);
+	}
 
 	@Override
 	protected void respondTCP(SocketChannel channel) throws IOException {
-		// TODO
+		ProtocolData received = new ProtocolData(buffer);
+		if (received.getType() == DataType.CHAT_OK) {
+			chatOK(received);
+		}
+		else if (received.getType() == DataType.CHAT_MSG) {
+			chatMsg(received);
+		}
+	}
+
+	private void chatOK(ProtocolData chatOK) throws IOException {
+		System.out.println("Bate-papo aceito:\n");
+		String host = chatOK.getHeaderLine(2);
+		Integer port = Integer.parseInt(chatOK.getHeaderLine(3));
+		p2pInstantiation(host, port); 
+		state = ClientState.CHATTING;	
+	}
+	
+	private void chatMsg(ProtocolData chatMsg) {
+		String sender = chatMsg.getHeaderLine(0);
+		String msg = chatMsg.getHeaderLine(1);
+		System.out.println("[" + sender + "]: " + msg);
 	}
 
 	@Override
