@@ -1,7 +1,7 @@
 /**
  * 
  */
-package dacortez.netChat;
+package dacortez.netChat.examples;
 
 import java.io.IOException;
 import java.net.DatagramPacket;

@@ -1,4 +1,4 @@
-package dacortez.netChat;
+package dacortez.netChat.examples;
 
 import java.io.*;
 import java.net.*;

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package dacortez.netChat;
+package dacortez.netChat.examples;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;

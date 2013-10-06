@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SocketChannel;
 
 public class Client {
 	private String host;
