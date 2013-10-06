@@ -10,8 +10,8 @@ import java.nio.channels.SocketChannel;
 public class TCPClient extends Client {
 	private Socket socket;
 	
-	public TCPClient(String host, int port) {
-		super(host, port);
+	public TCPClient(String host, int port, int clientPort) {
+		super(host, port, clientPort);
 	}
 	
 	@Override
@@ -42,25 +42,18 @@ public class TCPClient extends Client {
 	
 	@Override
 	protected void registerChannelsWithSelector() throws IOException {
-		setServerSocketChannel(8000);
+		setServerSocketChannel(clientPort);
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-		System.out.println("TCPClient listening on port 8000 for connections");
-		
+		//System.out.println("TCPClient listening on port " + clientPort);
 		setSelectableChannel();
 		stdin.register(selector, SelectionKey.OP_READ);
 		stdinPipe.start();
-		System.out.println("TCPClient listening stdin");
-		
-		
+		//System.out.println("TCPClient listening stdin");
 	}
 
 	@Override
 	protected void respondTCP(SocketChannel channel) throws IOException {
-		System.out.println("****");
-		ProtocolData received = new ProtocolData(buffer);
-		if (received.getType() == DataType.HEART_BEAT) {
-			System.out.println("**** RECEBIDO HEART_BEAT *******");
-		}
+		// TODO
 	}
 
 	@Override

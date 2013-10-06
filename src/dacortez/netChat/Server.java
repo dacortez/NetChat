@@ -44,28 +44,87 @@ public class Server extends Multiplex {
 	@Override
 	protected void respondTCP(SocketChannel channel) throws IOException {
 		ProtocolData received = new ProtocolData(buffer);
-		if (received.getType() == DataType.TCP_OK) {
-			sendTCP(received, channel);
+		if (received.getType() == DataType.TCP_OK)
+			tcpOK(channel, received);
+		else if (received.getType() == DataType.LOGIN_REQUEST)
+			loginRequest(channel, received);
+		else if (received.getType() == DataType.HEART_BEAT)
+			heartBeat();
+		else if (received.getType() == DataType.USERS_REQUEST)
+			usersRequest(channel);
+		else if (received.getType() == DataType.LOGOUT_REQUEST)
+			logoutRequest(channel, received);
+		else if (received.getType() == DataType.CHAT_REQUEST)
+			chatRequest(channel, received);
+	}
+
+	private void tcpOK(SocketChannel channel, ProtocolData received) throws IOException {
+		sendTCP(received, channel);
+	}
+
+	private void loginRequest(SocketChannel channel, ProtocolData received) throws IOException {
+		if (logInUser(received, channel))			
+			sendTCP(new ProtocolData(DataType.LOGIN_OK), channel);
+		else
+			sendTCP(new ProtocolData(DataType.LOGIN_FAIL), channel);
+	}
+
+	private void heartBeat() {
+		System.out.println("Heart beat received");
+	}
+
+	private void usersRequest(SocketChannel channel) throws IOException {
+		ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
+		for (User user: loggedInUsers)
+			usersList.addToHeader(user.toString());
+		tcpOK(channel, usersList);
+	}
+
+	private void logoutRequest(SocketChannel channel, ProtocolData received) throws IOException {
+		logOutUser(received.getHeaderLine(0));
+		sendTCP(new ProtocolData(DataType.LOGOUT_OK), channel);
+	}
+
+	private void chatRequest(SocketChannel channel, ProtocolData received) throws IOException {
+		User requested = getLoggedUser(received.getHeaderLine(0));
+		if (requested != null)
+			checkConnectionAndLock(channel, requested);
+		else {
+			ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
+			chatDenied.addToHeader("usuario nao conectado");
+			sendTCP(chatDenied, channel);
 		}
-		else if (received.getType() == DataType.LOGIN_REQUEST) {
-			if (logInUser(received, channel))			
-				sendTCP(new ProtocolData(DataType.LOGIN_OK), channel);
-			else
-				sendTCP(new ProtocolData(DataType.LOGIN_FAIL), channel);
+	}
+
+	private void checkConnectionAndLock(SocketChannel channel, User requested) throws IOException {
+		ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
+		if (requested.getType() == ConnectionType.TCP) {
+			if (!requested.isLocked()) {
+				sendChatOK(requested, channel);
+			}
+			else {
+				chatDenied.addToHeader("usuario bloqueado");
+				sendTCP(chatDenied, channel);
+			}
 		}
-		else if (received.getType() == DataType.HEART_BEAT) {
-			System.out.println(received);
+		else {
+			chatDenied.addToHeader("outro tipo de conexao");
+			sendTCP(chatDenied, channel);
 		}
-		else if (received.getType() == DataType.USERS_REQUEST) {
-			ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
-			for (User user: loggedInUsers)
-				usersList.addToHeader(user.toString());
-			sendTCP(usersList, channel);
-		}
-		else if (received.getType() == DataType.LOGOUT_REQUEST) {
-			logOutUser(received.getHeaderLine(0));
-			sendTCP(new ProtocolData(DataType.LOGOUT_OK), channel);
-		}
+	}
+
+	private void sendChatOK(User requested, SocketChannel channel) throws IOException {
+		ProtocolData chatOK = new ProtocolData(DataType.CHAT_OK);
+		chatOK.addToHeader(requested.getHost());
+		chatOK.addToHeader(requested.getClientPort().toString());
+		sendTCP(chatOK, channel);
+	}
+	
+	private User getLoggedUser(String userName) {
+		for (User user: loggedInUsers)
+			if (user.hasUserName(userName))
+				return user;
+		return null;
 	}
 	
 	@Override
@@ -81,6 +140,7 @@ public class Server extends Multiplex {
 	private boolean logInUser(ProtocolData loginInfo, Channel channel) {
 		String userName = loginInfo.getHeaderLine(0);
 		String password = loginInfo.getHeaderLine(1);
+		String clientPort = loginInfo.getHeaderLine(2);
 		for (User user: allUsers)
 			if (user.hasUserName(userName) && user.authenticate(password)) {
 				// TODO Falta verificar se o usuário já está logado.
@@ -89,6 +149,8 @@ public class Server extends Multiplex {
 				user.setChannel(channel);
 				user.setPort(socket.socket().getPort());
 				user.setHost(socket.socket().getInetAddress().getHostName());
+				user.setClientPort(Integer.parseInt(clientPort));
+				user.setLocked(false);
 				loggedInUsers.add(user);
 				return true;
 			}

@@ -172,6 +172,12 @@ public class ProtocolData {
 			return DataType.LOGOUT_REQUEST;
 		if (value.contentEquals(DataType.LOGOUT_OK.toString()))
 			return DataType.LOGOUT_OK;
+		if (value.contentEquals(DataType.CHAT_REQUEST.toString()))
+			return DataType.CHAT_REQUEST;
+		if (value.contentEquals(DataType.CHAT_OK.toString()))
+			return DataType.CHAT_OK;
+		if (value.contentEquals(DataType.CHAT_DENIED.toString()))
+			return DataType.CHAT_DENIED;
 		if (value.contentEquals(DataType.HEART_BEAT.toString()))
 			return DataType.HEART_BEAT;
 		return null;

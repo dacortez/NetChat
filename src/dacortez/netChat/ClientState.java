@@ -1,5 +1,5 @@
 package dacortez.netChat;
 
 public enum ClientState {
-	SCANNING_MENU, CHOOSING_USER, TYPING_MSG, TYPING_FILE, WAITING;
+	SCANNING_MENU, TYPING_USER, CHATING, TYPING_FILE;
 }

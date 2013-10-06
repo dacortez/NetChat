@@ -3,12 +3,15 @@ package dacortez.netChat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Socket;
 import java.nio.channels.ReadableByteChannel;
+import java.util.Random;
 import java.util.TimerTask;
 
 public abstract class Client extends Multiplex {
 	protected String host;
 	protected int port;
+	protected Integer clientPort;
 	protected final byte[] serverBuffer = new byte[16384];
 	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 	protected String userName;
@@ -19,12 +22,13 @@ public abstract class Client extends Multiplex {
 		String host = args[0];
 		int port = Integer.parseInt(args[1]);
 		if (args[2].charAt(0) == 'T')
-			new TCPClient(host, port).start();
+			new TCPClient(host, port, 5000 + new Random().nextInt(1000)).start();
 	}
 	
-	public Client(String host, int port) {
+	public Client(String host, int port, int clientPort) {
 		this.host = host;
 		this.port = port;
+		this.clientPort = clientPort;
 	}
 	
 	protected abstract void start() throws IOException;
@@ -36,10 +40,8 @@ public abstract class Client extends Multiplex {
 			public void run() {
 				try {
 					ProtocolData heartBeat = new ProtocolData(DataType.HEART_BEAT);
-					System.out.println("Sending heart beat to server... " + heartBeat);
 					sendToServer(heartBeat);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
@@ -51,35 +53,39 @@ public abstract class Client extends Multiplex {
 	protected abstract ProtocolData receiveFromServer() throws IOException;
 
 	protected void doLogin() throws IOException {
-		System.out.println("Servidor disponível!");
-		System.out.println("Faça seu login...");
-		
-		System.out.print("Username: ");
-		userName = inFromUser.readLine();
-		System.out.print("Password: ");
-		String password = inFromUser.readLine();
-		
-		ProtocolData loginInfo = new ProtocolData(DataType.LOGIN_REQUEST);
-		loginInfo.addToHeader(userName);
-		loginInfo.addToHeader(password);
-		sendToServer(loginInfo);
-		
+		sendToServer(getLoginRequest());
 		ProtocolData received = receiveFromServer();
 		if (received.getType() == DataType.LOGIN_OK) {
 			System.out.println("Bem-vindo ao servidor de Chat!");
 			printMenu();
 			run();
 		}
-		else if (received.getType() == DataType.LOGIN_FAIL)
+		else if (received.getType() == DataType.LOGIN_FAIL) {
 			System.out.println("Login inválido! Até a próxima...");
+			timer.cancel();
+		}
+	}
+
+	private ProtocolData getLoginRequest() throws IOException {
+		System.out.println("Servidor disponível!");
+		System.out.println("Faça seu login...");
+		System.out.print("Username: ");
+		userName = inFromUser.readLine().toLowerCase();
+		System.out.print("Password: ");
+		String password = inFromUser.readLine();
+		ProtocolData loginRequest = new ProtocolData(DataType.LOGIN_REQUEST);
+		loginRequest.addToHeader(userName);
+		loginRequest.addToHeader(password);
+		loginRequest.addToHeader(clientPort.toString());
+		return loginRequest;
 	}
 	
 	private void printMenu() {
 		System.out.println("(U) Lista usuários logados");
-		System.out.println("(B) Iniciar bate-papo com usuário logado");
-		System.out.println("(E) Enviar arquivo para usuário logado");
+		System.out.println("(B) Iniciar bate-papo com usuário");
+		System.out.println("(E) Enviar arquivo para usuário");
 		System.out.println("(L) Fazer logout");
-		System.out.println("Escolha uma das opções: ");
+		System.out.println("Escolha uma das opções:");
 		state = ClientState.SCANNING_MENU;
 	}
 	
@@ -87,18 +93,63 @@ public abstract class Client extends Multiplex {
 	protected void respondStdin(ReadableByteChannel channel) throws IOException {
 		// Buffer está com o conteúdo do teclado. Responde a entrada em função do estado do cliente.
 		switch (state) {
-		case SCANNING_MENU:	
-			switchMenuOption((char) buffer.get());
+		case TYPING_USER:
+			userTyped();
 			break;
-		case CHOOSING_USER:
-			break;
-		case TYPING_MSG:
+		case CHATING:
 			break;
 		case TYPING_FILE:
 			break;
-		case WAITING:
-			printMenu();
+		case SCANNING_MENU:	
+			switchMenuOption((char) buffer.get());
 		}		
+	}
+
+	private void userTyped() throws IOException {
+		System.out.println("Buscando usuário no servidor...");
+		ProtocolData chatRequest = getChatRequest();
+		if (chatRequest != null) {
+			sendToServer(chatRequest);
+			processResponseFromChatRequest();
+		} 
+		else {
+			System.out.println("O usuário não deve ser você mesmo.");
+			printMenu();
+		}
+	}
+
+	private void processResponseFromChatRequest() throws IOException {
+		ProtocolData received = receiveFromServer();
+		if (received.getType() == DataType.CHAT_DENIED) {
+			System.out.print("Bate-papo negado: ");
+			System.out.println(received.getHeaderLine(0));
+			printMenu();
+		}
+		else if (received.getType() == DataType.CHAT_OK) {
+			System.out.println("Bate-papo aceito: ");
+			String host = received.getHeaderLine(0);
+			Integer port = Integer.parseInt(received.getHeaderLine(1));
+			
+			Socket p2p = new Socket(host, port); 
+			p2p.close();
+			
+			System.out.println(received);
+			printMenu();
+		}
+	}
+	
+	private ProtocolData getChatRequest() {
+		StringBuilder sb = new StringBuilder();
+		while (buffer.hasRemaining())
+		     sb.append((char) buffer.get());
+		sb.deleteCharAt(sb.length() - 1);
+		String requested = new String(sb.toString());
+		if (requested.toLowerCase().contentEquals(this.userName))
+			return null;
+		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
+		chatRequest.addToHeader(new String(sb.toString())); // requested
+		chatRequest.addToHeader(this.userName); // sender
+		return chatRequest;
 	}
 
 	private void switchMenuOption(char option) {
@@ -107,8 +158,8 @@ public abstract class Client extends Multiplex {
 			listUsers();
 			break;
 		case 'B':
-			System.out.println("Opção não implementada!");
-			printMenu();
+			System.out.println("Informe o Username do usuário:");
+			state = ClientState.TYPING_USER;
 			break;
 		case 'E':
 			System.out.println("Opção não implementada!");
@@ -135,8 +186,6 @@ public abstract class Client extends Multiplex {
 				int num = received.getNumberOfHeaderLines();
 				for (int i = 0; i < num; i++)
 					System.out.println(received.getHeaderLine(i));
-				System.out.print("Pressione <ENTER> para continuar...");
-				state = ClientState.WAITING;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -172,7 +172,7 @@ public abstract class Multiplex {
 	protected boolean readStdin(ReadableByteChannel channel) throws IOException {
         buffer.clear();
         int count = channel.read(buffer);
-        if (count < 0) return false;
+        if (count <= 0) return false;
         buffer.flip();
         //System.out.println ("Processed " + count + " from Stdin " + channel);
 		return true;

@@ -10,6 +10,8 @@ public class User {
 	private int port;
 	private ConnectionType type;
 	private Channel channel;
+	private boolean locked;
+	private Integer clientPort;
 	
 	public String getName() {
 		return name;
@@ -67,6 +69,22 @@ public class User {
 		this.channel = channel;
 	}
 
+	public boolean isLocked() {
+		return locked;
+	}
+
+	public void setLocked(boolean locked) {
+		this.locked = locked;
+	}
+
+	public Integer getClientPort() {
+		return clientPort;
+	}
+
+	public void setClientPort(int clientPort) {
+		this.clientPort = clientPort;
+	}
+
 	public User(String name, String userName, String passwordHash) {
 		this.name = name;
 		this.userName = userName;
@@ -83,6 +101,10 @@ public class User {
 	
 	@Override
 	public String toString() {
-		return name + " (" + userName + ")" + " from [" + host + "]: " + type;
+		StringBuilder sb = new StringBuilder();
+		sb.append(name).append(" (").append(userName).append(") @ ");
+		sb.append(host).append(": ").append(type).append("/").append(clientPort);
+		sb.append(" [").append(locked).append("]");
+		return sb.toString();
 	}
 }
