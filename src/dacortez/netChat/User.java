@@ -54,6 +54,6 @@ public class User {
 	
 	@Override
 	public String toString() {
-		return userName + " [" + host + "]";
+		return name + " (" + userName + ")" + " from [" + host + "]";
 	}
 }
