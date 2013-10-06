@@ -4,7 +4,7 @@ public class User {
 	private String name;
 	private String userName;
 	private String passwordHash;
-	private String hostName = null;
+	private String host = null;
 	
 	public String getName() {
 		return name;
@@ -30,12 +30,12 @@ public class User {
 		this.passwordHash = passwordHash;
 	}
 	
-	public String getHostName() {
-		return hostName;
+	public String getHost() {
+		return host;
 	}
 
-	public void setHostName(String hostName) {
-		this.hostName = hostName;
+	public void setHost(String host) {
+		this.host = host;
 	}
 
 	public User(String name, String userName, String passwordHash) {
@@ -54,6 +54,6 @@ public class User {
 	
 	@Override
 	public String toString() {
-		return userName + " [" + hostName + "]";
+		return userName + " [" + host + "]";
 	}
 }

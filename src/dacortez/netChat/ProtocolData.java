@@ -5,28 +5,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ProtocolData {
-	private String title;
+	private DataType type;
 	private List<String> header;
 	private byte[] data;
 	
-	public ProtocolData(String title) {
+	public DataType getType() {
+		return type;
+	}
+	
+	public ProtocolData(DataType type) {
 		header = new ArrayList<String>();
-		this.title = title;
+		this.type = type;
 	}
 	
 	public ProtocolData(ByteBuffer buffer) {
 		header = new ArrayList<String>();
-		int i = setTitle(buffer);
+		int i = setType(buffer);
 		i = setHeader(buffer, i);
 		setData(buffer, i); 
 	}
 
-	private int setTitle(ByteBuffer buffer) {
+	private int setType(ByteBuffer buffer) {
 		StringBuilder sb = new StringBuilder();	
 		int i = 0;
 		while ((char) buffer.get(i) != '\r' && (char) buffer.get(i + 1) != '\n')
 			sb.append((char) buffer.get(i++));
-		title = new String(sb);
+		type = selectDataType(new String(sb));
 		return i + 2;
 	}
 
@@ -45,9 +49,11 @@ public class ProtocolData {
 	
 	private void setData(ByteBuffer buffer, int i) {
 		int j = 0;
-		data = new byte[buffer.limit() - i];
-		while (i < buffer.limit())
-			data[j++] = buffer.get(i++);
+		if (buffer.limit() > i) {
+			data = new byte[buffer.limit() - i];
+			while (i < buffer.limit())
+				data[j++] = buffer.get(i++);
+		}
 	}
 	
 	public ProtocolData(byte[] array, int length) {
@@ -62,7 +68,7 @@ public class ProtocolData {
 		int i = 0;
 		while ((char) array[i] != '\r' && (char) array[i + 1] != '\n')
 			sb.append((char) array[i++]);
-		title = new String(sb);
+		type = selectDataType(new String(sb));
 		return i + 2;
 	}
 	
@@ -81,14 +87,16 @@ public class ProtocolData {
 	
 	private void setData(byte[] array, int i, int length) {
 		int j = 0;
-		data = new byte[length - i];
-		while (i < length)
-			data[j++] = array[i++];
+		if (length > i) {
+			data = new byte[length - i];
+			while (i < length)
+				data[j++] = array[i++];
+		}
 	}
 	
 	public byte[] toByteArray() {
 		byte[] array = new byte[getSize()];
-		int i = appendLine(title, 0, array);
+		int i = appendLine(type.toString(), 0, array);
 		for (String line: header)
 			i = appendLine(line, i, array);
 		array[i++] = '\r'; array[i++] = '\n';
@@ -107,7 +115,7 @@ public class ProtocolData {
 	
 	public ByteBuffer toByteBuffer() {
 		ByteBuffer buffer = ByteBuffer.allocate(getSize());
-		int i = appendLine(title, 0, buffer);
+		int i = appendLine(type.toString(), 0, buffer);
 		for (String line: header)
 			i = appendLine(line, i, buffer);
 		buffer.put(i++, (byte) '\r'); buffer.put(i++, (byte) '\n');
@@ -126,7 +134,7 @@ public class ProtocolData {
 	}
 	
 	public int getSize() {
-		int size = title.length() + 2;
+		int size = type.toString().length() + 2;
 		for (String line: header)
 			size += line.length() + 2;
 		size += 2;
@@ -147,34 +155,30 @@ public class ProtocolData {
 		return header.get(index);
 	}
 	
-	public boolean isTCPOK() {
-		return title.contentEquals(Protocol.TCP_OK);
-	}
-	
-	public boolean isLoginInfo() {
-		return title.contentEquals(Protocol.LOGIN_INFO);
-	}
-	
-	public boolean isLoginOK() {
-		return title.contentEquals(Protocol.LOGIN_OK);
-	}
-	
-	public boolean isLoginFail() {
-		return title.contentEquals(Protocol.LOGIN_FAIL);
-	}
-	
-	public boolean isUsersRequest() {
-		return title.contentEquals(Protocol.USERS_REQUEST);
-	}
-	
-	public boolean isUsersList() {
-		return title.contentEquals(Protocol.USERS_LIST);
+	private DataType selectDataType(String value) {
+		if (value.contentEquals(DataType.TCP_OK.toString()))
+			return DataType.TCP_OK;
+		if (value.contentEquals(DataType.LOGIN_REQUEST.toString()))
+			return DataType.LOGIN_REQUEST;
+		if (value.contentEquals(DataType.LOGIN_OK.toString()))
+			return DataType.LOGIN_OK;
+		if (value.contentEquals(DataType.LOGIN_FAIL.toString()))
+			return DataType.LOGIN_FAIL;
+		if (value.contentEquals(DataType.USERS_REQUEST.toString()))
+			return DataType.USERS_REQUEST;
+		if (value.contentEquals(DataType.USERS_LIST.toString()))
+			return DataType.USERS_LIST;
+		if (value.contentEquals(DataType.LOGOUT_REQUEST.toString()))
+			return DataType.LOGOUT_REQUEST;
+		if (value.contentEquals(DataType.LOGOUT_OK.toString()))
+			return DataType.LOGOUT_OK;
+		return null;
 	}
 	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder(); 
-		sb.append(title).append("\r\n");
+		sb.append(type.toString()).append("\r\n");
 		for (String line: header)
 			sb.append(line).append("\r\n");
 		sb.append("\r\n");

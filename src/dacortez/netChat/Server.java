@@ -68,7 +68,7 @@ public class Server {
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 		System.out.println("Listening TCP on port " + port);
 		datagramChannel.register(selector, SelectionKey.OP_READ);
-		System.out.println("Listening UDP on port " + port);
+		System.out.println("Listening UDP on port " + port);		
 		return selector;
 	}
 	
@@ -155,21 +155,25 @@ public class Server {
 
 	private void respondTCP(SocketChannel socketChannel) throws IOException {
 		ProtocolData received = new ProtocolData(buffer);
-		if (received.isTCPOK()) {
+		if (received.getType() == DataType.TCP_OK) {
 			sendTCP(received, socketChannel);
 		}
-		else if (received.isLoginInfo()) {
+		else if (received.getType() == DataType.LOGIN_REQUEST) {
 			InetAddress inet = socketChannel.socket().getInetAddress();
 			if (logInUser(received, inet.getHostName()))			
-				sendTCP(new ProtocolData(Protocol.LOGIN_OK), socketChannel);
+				sendTCP(new ProtocolData(DataType.LOGIN_OK), socketChannel);
 			else
-				sendTCP(new ProtocolData(Protocol.LOGIN_FAIL), socketChannel);
+				sendTCP(new ProtocolData(DataType.LOGIN_FAIL), socketChannel);
 		}
-		else if (received.isUsersRequest()) {
-			ProtocolData usersList = new ProtocolData(Protocol.USERS_LIST);
+		else if (received.getType() == DataType.USERS_REQUEST) {
+			ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
 			for (User user: loggedInUsers)
 				usersList.addToHeader(user.toString());
 			sendTCP(usersList, socketChannel);
+		}
+		else if (received.getType() == DataType.LOGOUT_REQUEST) {
+			logOutUser(received.getHeaderLine(0));
+			sendTCP(new ProtocolData(DataType.LOGOUT_OK), socketChannel);
 		}
 	}
 	
@@ -182,12 +186,24 @@ public class Server {
 		String password = loginInfo.getHeaderLine(1);
 		for (User user: allUsers)
 			if (user.hasUserName(userName) && user.authenticate(password)) {
-				user.setHostName(host);
+				// TODO Falta verificar se o usuário já está logado.
+				user.setHost(host);
 				loggedInUsers.add(user);
-				System.out.println(user);
 				return true;
 			}
 		return false;
+	}
+	
+	private void logOutUser(String userName) {
+		User found = null;
+		for (User user: loggedInUsers)
+			if (user.hasUserName(userName)) {
+				found = user;
+				break;
+			}
+		if (found != null) {
+			loggedInUsers.remove(found);
+		}
 	}
 	
 	private void closeSockect(SelectionKey selectionKey, SocketChannel socketChannel) {
