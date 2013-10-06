@@ -1,24 +1,21 @@
 package dacortez.netChat;
 
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.Socket;
-import java.net.UnknownHostException;
 
-public class Client {
-	private String host;
-	private int port;
-	private final byte[] buffer = new byte[16384];
-	private final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
-	private Socket socket;
-	private String userName;
+public abstract class Client extends Multiplex {
+	protected String host;
+	protected int port;
+	protected final byte[] buffer = new byte[16384];
+	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+	protected String userName;
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
 		int port = Integer.parseInt(args[1]);
-		new Client(host, port).start();
+		if (args[2].charAt(0) == 'T')
+			new TCPClient(host, port).start();
 	}
 	
 	public Client(String host, int port) {
@@ -26,24 +23,13 @@ public class Client {
 		this.port = port;
 	}
 
-	public void start() {
-		try {
-			socket = new Socket(host, port);
-			ProtocolData tcpOK = new ProtocolData(DataType.TCP_OK);
-			sendTCP(tcpOK);
-			if (receiveTCP().getType() == DataType.TCP_OK)
-				requestLogin();
-			socket.close();
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}		
-	}
+	protected abstract void start() throws IOException;
+	
+	protected abstract void send(ProtocolData data) throws IOException;
+	
+	protected abstract ProtocolData receive() throws IOException;
 
-	private void requestLogin() throws IOException {
+	protected void doLogin() throws IOException {
 		System.out.println("Servidor disponível!");
 		System.out.println("Faça seu login...");
 		
@@ -55,9 +41,9 @@ public class Client {
 		ProtocolData loginInfo = new ProtocolData(DataType.LOGIN_REQUEST);
 		loginInfo.addToHeader(userName);
 		loginInfo.addToHeader(password);
-		sendTCP(loginInfo);
+		send(loginInfo);
 		
-		ProtocolData received = receiveTCP();
+		ProtocolData received = receive();
 		if (received.getType() == DataType.LOGIN_OK) {
 			System.out.println("Bem-vindo ao servidor de Chat!");
 			mainMenu();
@@ -67,6 +53,7 @@ public class Client {
 	}
 	
 	private void mainMenu() throws IOException {
+		// Implementa aqui a multiplexação pois login ok.
 		while (true) {
 			printMenu();
 			String option = inFromUser.readLine();
@@ -88,8 +75,8 @@ public class Client {
 	}
 	
 	private void listUsers() throws IOException {
-		sendTCP(new ProtocolData(DataType.USERS_REQUEST));
-		ProtocolData received = receiveTCP();
+		send(new ProtocolData(DataType.USERS_REQUEST));
+		ProtocolData received = receive();
 		if (received.getType() == DataType.USERS_LIST) {
 			System.out.println("Lista de usuários logados:");
 			int num = received.getNumberOfHeaderLines();
@@ -103,26 +90,12 @@ public class Client {
 	private boolean logout() throws IOException {
 		ProtocolData logoutRequest = new ProtocolData(DataType.LOGOUT_REQUEST);
 		logoutRequest.addToHeader(userName);
-		sendTCP(logoutRequest);
-		ProtocolData received = receiveTCP();
+		send(logoutRequest);
+		ProtocolData received = receive();
 		if (received.getType() == DataType.LOGOUT_OK) {
 			System.out.println("Até a próxima...");
 			return true;
 		}
 		return false;
-	}
-
-	private void sendTCP(ProtocolData data) throws IOException {
-		byte[] array = data.toByteArray();
-		DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-		out.write(array);
-		System.out.println("Sent " + array.length + " from " + socket);
-	}
-	
-	private ProtocolData receiveTCP() throws IOException {
-		int length = socket.getInputStream().read(buffer);
-		ProtocolData protocolData = new ProtocolData(buffer, length); 
-		System.out.println("Read " + length + " from " + socket);
-		return protocolData;
 	}
 }
