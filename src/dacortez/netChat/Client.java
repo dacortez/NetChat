@@ -82,7 +82,7 @@ public abstract class Client extends Multiplex {
 		return loginRequest;
 	}
 	
-	private void printMenu() {
+	protected void printMenu() {
 		System.out.println("(U) Lista usuários logados");
 		System.out.println("(B) Iniciar bate-papo com usuário");
 		System.out.println("(E) Enviar arquivo para usuário");
@@ -133,7 +133,7 @@ public abstract class Client extends Multiplex {
 	}
 
 	private void chatOK(ProtocolData chatOK) throws IOException {
-		System.out.println("Bate-papo aceito:\n");
+		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
 		String host = chatOK.getHeaderLine(0);
 		Integer port = Integer.parseInt(chatOK.getHeaderLine(1));
 		p2pInstantiation(host, port); 
@@ -142,33 +142,47 @@ public abstract class Client extends Multiplex {
 	}
 	
 	private void chatting() throws IOException {
-		p2pPipe.send(getChatMsg());
+		ProtocolData chatMsg = getChatMsg();
+		if (chatMsg != null)
+			p2pPipe.send(chatMsg);
 	}
 
-	private ProtocolData getChatMsg() {
+	private ProtocolData getChatMsg() throws IOException {
+		String msg = bufferToString();
+		if (msg.isEmpty()) 
+			return null;
+		if (msg.contentEquals("q()"))
+			return getChatFinished();
+		ProtocolData chatMsg = new ProtocolData(DataType.CHAT_MSG);
+		chatMsg.addToHeader(this.userName); 
+		chatMsg.addToHeader(msg); 
+		return chatMsg;
+	}
+	
+	private ProtocolData getChatFinished() throws IOException {
+		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
+		chatEnd.addToHeader(userName);
+		serverPipe.send(chatEnd);
+		return serverPipe.receive();
+	}
+	
+	private String bufferToString() {
 		StringBuilder sb = new StringBuilder();
 		while (buffer.hasRemaining())
 		     sb.append((char) buffer.get());
-		sb.deleteCharAt(sb.length() - 1);
-		String msg = new String(sb.toString());
-		ProtocolData chatMsg = new ProtocolData(DataType.CHAT_MSG);
-		chatMsg.addToHeader(this.userName);
-		chatMsg.addToHeader(msg); 
-		return chatMsg;
+		int length = sb.length();
+		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
+		return sb.toString();
 	}
 
 	protected abstract void p2pInstantiation(String host, Integer port) throws IOException;
 	
 	private ProtocolData getChatRequest() {
-		StringBuilder sb = new StringBuilder();
-		while (buffer.hasRemaining())
-		     sb.append((char) buffer.get());
-		sb.deleteCharAt(sb.length() - 1);
-		String requested = new String(sb.toString());
+		String requested = bufferToString();
 		if (requested.toLowerCase().contentEquals(this.userName))
 			return null;
 		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
-		chatRequest.addToHeader(new String(sb.toString())); // requested
+		chatRequest.addToHeader(requested); // requested
 		chatRequest.addToHeader(this.userName); // sender
 		return chatRequest;
 	}
@@ -177,6 +191,7 @@ public abstract class Client extends Multiplex {
 		switch (option) {
 		case 'U':
 			listUsers();
+			printMenu();
 			break;
 		case 'B':
 			System.out.println("Informe o Username do usuário:");

@@ -14,6 +14,8 @@ public enum DataType {
 	CHAT_OK("CHAT/OK"),
 	CHAT_DENIED("CHAT/DENIED"),
 	CHAT_MSG("CHAT/MSG"),
+	CHAT_END("CHAT/END"),
+	CHAT_FINISHED("CHAT/FINISHED"),
 	HEART_BEAT("HEART/BEAT");
 	
 	private final String value;

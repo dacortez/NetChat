@@ -37,10 +37,16 @@ public class TCPClient extends Client {
 		else if (received.getType() == DataType.CHAT_MSG) {
 			chatMsg(received);
 		}
+		else if (received.getType() == DataType.CHAT_FINISHED) {
+			chatFinished(channel);
+		}
+		else if (received.getType() == DataType.CHAT_END) {
+			chatEnd(channel);
+		}
 	}
 
 	private void chatOK(ProtocolData chatOK) throws IOException {
-		System.out.println("Bate-papo aceito:\n");
+		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
 		String host = chatOK.getHeaderLine(2);
 		Integer port = Integer.parseInt(chatOK.getHeaderLine(3));
 		p2pInstantiation(host, port); 
@@ -51,6 +57,28 @@ public class TCPClient extends Client {
 		String sender = chatMsg.getHeaderLine(0);
 		String msg = chatMsg.getHeaderLine(1);
 		System.out.println("[" + sender + "]: " + msg);
+	}
+	
+	private void chatFinished(SocketChannel channel) throws IOException {
+		channel.keyFor(selector).cancel();
+		channel.close();
+		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
+		chatEnd.addToHeader(userName);
+		serverPipe.send(chatEnd);
+		if (serverPipe.receive().getType() == DataType.CHAT_FINISHED) {
+			p2pPipe.send(chatEnd);
+			p2pPipe.close();
+			System.out.println("Bate-papo-finalizado!");
+			printMenu();
+		}
+	}
+	
+	private void chatEnd(SocketChannel channel) throws IOException {
+		channel.keyFor(selector).cancel();
+		channel.close();
+		p2pPipe.close();
+		System.out.println("Bate-papo-finalizado!");
+		printMenu();
 	}
 
 	@Override

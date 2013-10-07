@@ -23,6 +23,7 @@ public class Server extends Multiplex {
 		allUsers = new ArrayList<User>();
 		allUsers.add(new User("Daniel Augusto Cortez", "dacortez", "3858f62230ac3c915f300c664312c63f"));
 		allUsers.add(new User("Angela Pedroso Tonon", "aptonon", "96948aad3fcae80c08a35c9b5958cd89"));
+		allUsers.add(new User("Caio Aufusto Cortez", "cacortez", "3858f62230ac3c915f300c664312c63f"));
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -60,6 +61,8 @@ public class Server extends Multiplex {
 			logoutRequest(channel, received);
 		else if (received.getType() == DataType.CHAT_REQUEST)
 			chatRequest(channel, received);
+		else if (received.getType() == DataType.CHAT_END)
+			chatEnd(channel, received);
 	}
 
 	private void tcpOK(SocketChannel channel, ProtocolData received) throws IOException {
@@ -89,9 +92,9 @@ public class Server extends Multiplex {
 		sendTCP(new ProtocolData(DataType.LOGOUT_OK), channel);
 	}
 
-	private void chatRequest(SocketChannel channel, ProtocolData received) throws IOException {
-		User requested = getLoggedUser(received.getHeaderLine(0));
-		User sender = getLoggedUser(received.getHeaderLine(1));
+	private void chatRequest(SocketChannel channel, ProtocolData chatRequest) throws IOException {
+		User requested = getLoggedUser(chatRequest.getHeaderLine(0));
+		User sender = getLoggedUser(chatRequest.getHeaderLine(1));
 		if (requested != null)
 			checkConnectionAndLock(channel, requested, sender);
 		else {
@@ -129,6 +132,14 @@ public class Server extends Multiplex {
 		sendTCP(chatOK, channel);
 	}
 	
+	private void chatEnd(SocketChannel channel, ProtocolData chatEnd) throws IOException {
+		User user = getLoggedUser(chatEnd.getHeaderLine(0));
+		user.setLocked(false);
+		ProtocolData chatFinished = new ProtocolData(DataType.CHAT_FINISHED);
+		chatFinished.addToHeader(user.getUserName());
+		sendTCP(chatFinished, channel);
+	}
+
 	private User getLoggedUser(String userName) {
 		for (User user: loggedInUsers)
 			if (user.hasUserName(userName))
