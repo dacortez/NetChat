@@ -3,7 +3,6 @@ package dacortez.netChat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
 import java.nio.channels.Channel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
@@ -88,7 +87,6 @@ public abstract class Client extends Multiplex {
 		ProtocolData loginRequest = new ProtocolData(DataType.LOGIN_REQUEST);
 		loginRequest.addToHeader(userName);
 		loginRequest.addToHeader(password);
-		loginRequest.addToHeader(InetAddress.getLocalHost().getHostAddress());
 		loginRequest.addToHeader(clientPort.toString());
 		return loginRequest;
 	}

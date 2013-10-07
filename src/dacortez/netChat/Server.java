@@ -108,7 +108,7 @@ public class Server extends Multiplex {
 			InetAddress inet = ((InetSocketAddress) address).getAddress(); 
 			user.setHost(inet.getHostAddress());
 		}
-		Integer clientPort = Integer.parseInt(loginRequest.getHeaderLine(3));
+		Integer clientPort = Integer.parseInt(loginRequest.getHeaderLine(2));
 		user.setClientPort(clientPort);
 		user.setLocked(false);
 	}

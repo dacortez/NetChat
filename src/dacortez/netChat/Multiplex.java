@@ -135,7 +135,7 @@ public abstract class Multiplex {
 		DatagramChannel channel = null;
 		try {
 			channel = (DatagramChannel) key.channel();
-			if (readUDP(channel)) {
+			if (readUDPAndSetAddress(channel)) {
 				DatagramChannel newChannel = DatagramChannel.open(); 
 				newChannel.connect(address);
 				respond(newChannel);
@@ -165,7 +165,7 @@ public abstract class Multiplex {
 		return true;
 	}
 	
-	private boolean readUDP(DatagramChannel channel) throws IOException {
+	private boolean readUDPAndSetAddress(DatagramChannel channel) throws IOException {
 		buffer.clear();
 		address = channel.receive(buffer);
 		buffer.flip();
