@@ -26,6 +26,7 @@ public abstract class Multiplex {
 	protected DatagramChannel datagramChannel;
 	protected SelectableChannel stdin;
 	protected Timer timer = new Timer();
+	protected SocketAddress address;
 	
 	public void run() {
 		try {
@@ -134,8 +135,7 @@ public abstract class Multiplex {
 		DatagramChannel channel = null;
 		try {
 			channel = (DatagramChannel) key.channel();
-			InetSocketAddress address = readUDP(channel);
-			if (address != null) {
+			if (readUDP(channel)) {
 				DatagramChannel newChannel = DatagramChannel.open(); 
 				newChannel.connect(address);
 				respond(newChannel);
@@ -158,20 +158,20 @@ public abstract class Multiplex {
 	
 	private boolean readTCP(SocketChannel channel) throws IOException {
 		buffer.clear();
-		channel.read(buffer);
+		channel.read(buffer); 
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
 		//System.out.println("Read " + buffer.limit() + " from TCP " + channel);
 		return true;
 	}
 	
-	private InetSocketAddress readUDP(DatagramChannel channel) throws IOException {
+	private boolean readUDP(DatagramChannel channel) throws IOException {
 		buffer.clear();
-		SocketAddress address = channel.receive(buffer);
+		address = channel.receive(buffer);
 		buffer.flip();
-		if (buffer.limit() == 0) return null;
+		if (buffer.limit() == 0) return false;
 		//System.out.println("Processed " + buffer.limit() + " from UDP " + channel);
-		return (InetSocketAddress) address;
+		return true;
 	}
 
 	protected boolean readStdin(ReadableByteChannel channel) throws IOException {

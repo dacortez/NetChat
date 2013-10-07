@@ -1,6 +1,8 @@
 package dacortez.netChat;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.channels.Channel;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
@@ -96,13 +98,17 @@ public class Server extends Multiplex {
 	}
 
 	private void setLoggedInUser(Channel channel, User user, ProtocolData loginRequest) {
-		if (channel instanceof SocketChannel)
+		if (channel instanceof SocketChannel) {
 			user.setType(ConnectionType.TCP);
-		else if (channel instanceof DatagramChannel)
+			InetAddress inet = ((SocketChannel) channel).socket().getInetAddress();
+			user.setHost(inet.getHostAddress());
+		}
+		else if (channel instanceof DatagramChannel) {
 			user.setType(ConnectionType.UDP);
-		String address = loginRequest.getHeaderLine(2);
+			InetAddress inet = ((InetSocketAddress) address).getAddress(); 
+			user.setHost(inet.getHostAddress());
+		}
 		Integer clientPort = Integer.parseInt(loginRequest.getHeaderLine(3));
-		user.setHost(address);
 		user.setClientPort(clientPort);
 		user.setLocked(false);
 	}
