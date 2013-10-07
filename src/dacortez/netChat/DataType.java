@@ -2,7 +2,7 @@ package dacortez.netChat;
 
 public enum DataType {
 	
-	TCP_OK("TCP/OK"), 
+	CONNECTION_OK("CONNECTION/OK"), 
 	LOGIN_REQUEST("LOGIN/REQUEST"), 
 	LOGIN_OK("LOGIN/OK"), 
 	LOGIN_FAIL("LOGIN/FAIL"),

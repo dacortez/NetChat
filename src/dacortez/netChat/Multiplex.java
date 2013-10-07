@@ -5,6 +5,7 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.DatagramChannel;
@@ -46,7 +47,9 @@ public abstract class Multiplex {
 		closeChannels();
 	}
 	
-	protected abstract void setTimer();
+	protected void setTimer() {
+		// Por padrão não faz nada.
+	}
 	
 	protected abstract void registerChannelsWithSelector() throws IOException;
 	
@@ -119,7 +122,7 @@ public abstract class Multiplex {
 		try {
 			socketChannel = (SocketChannel) key.channel();
 			if (readTCP(socketChannel))
-				respondTCP(socketChannel);
+				respond(socketChannel);
 			else
 				closeSockect(key, socketChannel);
 		} catch (IOException ie) {
@@ -128,11 +131,15 @@ public abstract class Multiplex {
 	}
 	
 	private void handleReadableUDP(SelectionKey key) {
-		DatagramChannel datagramChannel = null;
+		DatagramChannel channel = null;
 		try {
-			datagramChannel = (DatagramChannel) key.channel();
-			if (readUDP(datagramChannel))
-				respondUDP(datagramChannel);
+			channel = (DatagramChannel) key.channel();
+			InetSocketAddress address = readUDP(channel);
+			if (address != null) {
+				DatagramChannel newChannel = DatagramChannel.open(); 
+				newChannel.connect(address);
+				respond(newChannel);
+			}
 		} catch (IOException ie) {
 			key.cancel();
 		}
@@ -158,13 +165,13 @@ public abstract class Multiplex {
 		return true;
 	}
 	
-	private boolean readUDP(DatagramChannel channel) throws IOException {
+	private InetSocketAddress readUDP(DatagramChannel channel) throws IOException {
 		buffer.clear();
-		channel.receive(buffer);
+		SocketAddress address = channel.receive(buffer);
 		buffer.flip();
-		if (buffer.limit() == 0) return false;
+		if (buffer.limit() == 0) return null;
 		//System.out.println("Processed " + buffer.limit() + " from UDP " + channel);
-		return true;
+		return (InetSocketAddress) address;
 	}
 
 	protected boolean readStdin(ReadableByteChannel channel) throws IOException {
@@ -178,13 +185,13 @@ public abstract class Multiplex {
 	
 	//-------------------------------------------------------------------------------
 	
-	protected abstract void respondTCP(SocketChannel channel) throws IOException;
-	
-	protected abstract void respondUDP(DatagramChannel channel) throws IOException;
-	
-	protected abstract void respondStdin(ReadableByteChannel channel) throws IOException;
+	protected abstract void respond(Channel channel) throws IOException;
 	
 	//-------------------------------------------------------------------------------
+	
+	protected void respondStdin(ReadableByteChannel channel) throws IOException {
+		// Por padrão não faz nada.
+	}
 	
 	protected void closeSockect(SelectionKey key, SocketChannel channel) {
 		key.cancel();
@@ -208,9 +215,12 @@ public abstract class Multiplex {
 		//System.out.println("Closed " + channel);
 	}
 	
-	protected void sendTCP(ProtocolData data, SocketChannel channel) throws IOException {
+	protected void send(Channel channel, ProtocolData data) throws IOException {
 		ByteBuffer buffer = data.toByteBuffer();
-		channel.write(buffer);
+		if (channel instanceof SocketChannel)
+			((SocketChannel) channel).write(buffer);
+		else if (channel instanceof DatagramChannel)
+			((DatagramChannel) channel).write(buffer);
 		//System.out.println("Sent " + buffer.limit() + " from " + channel);
 	}
 }

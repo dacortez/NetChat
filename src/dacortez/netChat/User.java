@@ -5,7 +5,6 @@ public class User {
 	private String userName;
 	private String passwordHash;
 	private String host = null;
-	private int port;
 	private ConnectionType type;
 	private boolean locked;
 	private Integer clientPort;
@@ -42,14 +41,6 @@ public class User {
 		this.host = host;
 	}
 	
-	public int getPort() {
-		return port;
-	}
-
-	public void setPort(int port) {
-		this.port = port;
-	}
-
 	public ConnectionType getType() {
 		return type;
 	}

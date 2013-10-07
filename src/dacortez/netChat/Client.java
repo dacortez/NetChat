@@ -3,13 +3,16 @@ package dacortez.netChat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.nio.channels.Channel;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Random;
 import java.util.TimerTask;
 
 public abstract class Client extends Multiplex {
 	protected String host;
-	protected int port;
+	protected Integer port;
 	protected Integer clientPort;
 	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 	protected String userName;
@@ -21,8 +24,14 @@ public abstract class Client extends Multiplex {
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
 		int port = Integer.parseInt(args[1]);
-		if (args[2].charAt(0) == 'T')
+		if (args[2].charAt(0) == 'T') {
+			System.out.println("TCP");
 			new TCPClient(host, port, 5000 + new Random().nextInt(1000)).start();
+		}
+		else if (args[2].charAt(0) == 'U') {
+			System.out.println("UDP");
+			new UDPClient(host, port, 5000 + new Random().nextInt(1000)).start();
+		}
 	}
 	
 	public Client(String host, int port, int clientPort) {
@@ -32,9 +41,10 @@ public abstract class Client extends Multiplex {
 	}
 	
 	protected void start() throws IOException {
-		ProtocolData tcpOK = new ProtocolData(DataType.TCP_OK);
-		serverPipe.send(tcpOK);
-		if (serverPipe.receive().getType() == DataType.TCP_OK)
+		ProtocolData connectionOK = new ProtocolData(DataType.CONNECTION_OK);
+		serverPipe.send(connectionOK);
+		ProtocolData received = serverPipe.receive();
+		if (received.getType() == DataType.CONNECTION_OK)
 			doLogin();
 		serverPipe.close();		
 	}
@@ -55,7 +65,7 @@ public abstract class Client extends Multiplex {
 	}
 	
 	protected void doLogin() throws IOException {
-		serverPipe.send(getLoginRequest());
+		serverPipe.send(loginRequest());
 		ProtocolData received = serverPipe.receive();
 		if (received.getType() == DataType.LOGIN_OK) {
 			System.out.println("Bem-vindo ao servidor de Chat!");
@@ -68,7 +78,7 @@ public abstract class Client extends Multiplex {
 		}
 	}
 
-	private ProtocolData getLoginRequest() throws IOException {
+	private ProtocolData loginRequest() throws IOException {
 		System.out.println("Servidor disponível!");
 		System.out.println("Faça seu login...");
 		System.out.print("Username: ");
@@ -78,6 +88,7 @@ public abstract class Client extends Multiplex {
 		ProtocolData loginRequest = new ProtocolData(DataType.LOGIN_REQUEST);
 		loginRequest.addToHeader(userName);
 		loginRequest.addToHeader(password);
+		loginRequest.addToHeader(InetAddress.getLocalHost().getHostAddress());
 		loginRequest.addToHeader(clientPort.toString());
 		return loginRequest;
 	}
@@ -93,10 +104,9 @@ public abstract class Client extends Multiplex {
 	
 	@Override
 	protected void respondStdin(ReadableByteChannel channel) throws IOException {
-		// Buffer está com o conteúdo do teclado. Responde a entrada em função do estado do cliente.
 		switch (state) {
 		case TYPING_USER:
-			userTyped();
+			typingUser();
 			break;
 		case CHATTING:
 			chatting();
@@ -108,9 +118,9 @@ public abstract class Client extends Multiplex {
 		}		
 	}
 
-	private void userTyped() throws IOException {
+	private void typingUser() throws IOException {
 		System.out.println("Buscando usuário no servidor...");
-		ProtocolData chatRequest = getChatRequest();
+		ProtocolData chatRequest = chatRequest();
 		if (chatRequest != null) {
 			serverPipe.send(chatRequest);
 			processResponseFromChatRequest();
@@ -119,6 +129,16 @@ public abstract class Client extends Multiplex {
 			System.out.println("O usuário não deve ser você mesmo.");
 			printMenu();
 		}
+	}
+	
+	private ProtocolData chatRequest() {
+		String requested = bufferToString();
+		if (requested.toLowerCase().contentEquals(this.userName))
+			return null;
+		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
+		chatRequest.addToHeader(requested); // requested
+		chatRequest.addToHeader(this.userName); // sender
+		return chatRequest;
 	}
 
 	private void processResponseFromChatRequest() throws IOException {
@@ -129,11 +149,11 @@ public abstract class Client extends Multiplex {
 			printMenu();
 		}
 		else if (received.getType() == DataType.CHAT_OK)
-			chatOK(received);
+			chatOKFromServer(received);
 	}
 
-	private void chatOK(ProtocolData chatOK) throws IOException {
-		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
+	private void chatOKFromServer(ProtocolData chatOK) throws IOException {
+		System.out.println("Bate-papo aceito (digite 'q()' para finalizar):\n");
 		String host = chatOK.getHeaderLine(0);
 		Integer port = Integer.parseInt(chatOK.getHeaderLine(1));
 		p2pInstantiation(host, port); 
@@ -141,51 +161,36 @@ public abstract class Client extends Multiplex {
 		p2pPipe.send(chatOK);	
 	}
 	
+	protected abstract void p2pInstantiation(String host, Integer port) throws IOException;
+	
 	private void chatting() throws IOException {
-		ProtocolData chatMsg = getChatMsg();
+		ProtocolData chatMsg = chatMsg();
 		if (chatMsg != null)
 			p2pPipe.send(chatMsg);
 	}
 
-	private ProtocolData getChatMsg() throws IOException {
+	// Melhorar ---------------------------------------------------------
+	
+	private ProtocolData chatMsg() throws IOException {
 		String msg = bufferToString();
 		if (msg.isEmpty()) 
 			return null;
 		if (msg.contentEquals("q()"))
-			return getChatFinished();
+			return chatFinished();
 		ProtocolData chatMsg = new ProtocolData(DataType.CHAT_MSG);
 		chatMsg.addToHeader(this.userName); 
 		chatMsg.addToHeader(msg); 
 		return chatMsg;
 	}
 	
-	private ProtocolData getChatFinished() throws IOException {
+	private ProtocolData chatFinished() throws IOException {
 		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
 		chatEnd.addToHeader(userName);
 		serverPipe.send(chatEnd);
 		return serverPipe.receive();
 	}
 	
-	private String bufferToString() {
-		StringBuilder sb = new StringBuilder();
-		while (buffer.hasRemaining())
-		     sb.append((char) buffer.get());
-		int length = sb.length();
-		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
-		return sb.toString();
-	}
-
-	protected abstract void p2pInstantiation(String host, Integer port) throws IOException;
-	
-	private ProtocolData getChatRequest() {
-		String requested = bufferToString();
-		if (requested.toLowerCase().contentEquals(this.userName))
-			return null;
-		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
-		chatRequest.addToHeader(requested); // requested
-		chatRequest.addToHeader(this.userName); // sender
-		return chatRequest;
-	}
+	// Fim melhorar -----------------------------------------------------
 
 	private void switchMenuOption(char option) {
 		switch (option) {
@@ -249,8 +254,75 @@ public abstract class Client extends Multiplex {
 		try {
 			selector.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+	}
+	
+	private String bufferToString() {
+		StringBuilder sb = new StringBuilder();
+		while (buffer.hasRemaining())
+		     sb.append((char) buffer.get());
+		int length = sb.length();
+		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
+		return sb.toString();
+	}
+	
+	@Override
+	protected void respond(Channel channel) throws IOException {
+		ProtocolData received = new ProtocolData(buffer);
+		if (received.getType() == DataType.CHAT_OK) {
+			chatOKFromPier(received);
+		}
+		else if (received.getType() == DataType.CHAT_MSG) {
+			chatMsg(received);
+		}
+		else if (received.getType() == DataType.CHAT_FINISHED) {
+			chatFinished(channel);
+		}
+		else if (received.getType() == DataType.CHAT_END) {
+			chatEnd(channel);
+		}
+	}
+
+	private void chatOKFromPier(ProtocolData chatOK) throws IOException {
+		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
+		String host = chatOK.getHeaderLine(2);
+		Integer port = Integer.parseInt(chatOK.getHeaderLine(3));
+		p2pInstantiation(host, port); 
+		state = ClientState.CHATTING;	
+	}
+	
+	private void chatMsg(ProtocolData chatMsg) {
+		String sender = chatMsg.getHeaderLine(0);
+		String msg = chatMsg.getHeaderLine(1);
+		System.out.println("[" + sender + "]: " + msg);
+	}
+	
+	private void chatFinished(Channel channel) throws IOException {
+		closeIfSocketChannel(channel);
+		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
+		chatEnd.addToHeader(userName);
+		serverPipe.send(chatEnd);
+		if (serverPipe.receive().getType() == DataType.CHAT_FINISHED) {
+			p2pPipe.send(chatEnd);
+			p2pPipe.close();
+			System.out.println("Bate-papo-finalizado!");
+			printMenu();
+		}
+	}
+	
+	private void chatEnd(Channel channel) throws IOException {
+		closeIfSocketChannel(channel);
+		p2pPipe.close();
+		System.out.println("Bate-papo-finalizado!");
+		printMenu();
+	}
+
+	private void closeIfSocketChannel(Channel channel) throws IOException {
+		if (channel instanceof SocketChannel) {
+			SocketChannel sc = (SocketChannel) channel;
+			sc.keyFor(selector).cancel();
+			sc.close();
 		}
 	}
 }

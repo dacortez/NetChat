@@ -156,8 +156,8 @@ public class ProtocolData {
 	}
 	
 	private DataType selectDataType(String value) {
-		if (value.contentEquals(DataType.TCP_OK.toString()))
-			return DataType.TCP_OK;
+		if (value.contentEquals(DataType.CONNECTION_OK.toString()))
+			return DataType.CONNECTION_OK;
 		if (value.contentEquals(DataType.LOGIN_REQUEST.toString()))
 			return DataType.LOGIN_REQUEST;
 		if (value.contentEquals(DataType.LOGIN_OK.toString()))

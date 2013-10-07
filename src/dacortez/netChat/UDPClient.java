@@ -3,17 +3,17 @@ package dacortez.netChat;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 
-public class TCPClient extends Client {
-	
-	public TCPClient(String host, int port, int clientPort) throws IOException {
+public class UDPClient extends Client {
+
+	public UDPClient(String host, int port, int clientPort) throws IOException {
 		super(host, port, clientPort);
-		serverPipe = new TCPPipe(host, port);
+		serverPipe = new UDPPipe(host, port);
 	}
-	
+
 	@Override
 	protected void registerChannelsWithSelector() throws IOException {
-		setServerSocketChannel(clientPort);
-		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+		setDatagramChannel(clientPort);
+		datagramChannel.register(selector, SelectionKey.OP_READ);
 		setSelectableChannel();
 		stdin.register(selector, SelectionKey.OP_READ);
 		stdinPipe.start();
@@ -21,6 +21,6 @@ public class TCPClient extends Client {
 	
 	@Override
 	protected void p2pInstantiation(String host, Integer port) throws IOException {
-		p2pPipe = new TCPPipe(host, port);
+		p2pPipe = new UDPPipe(host, port);
 	}
 }
