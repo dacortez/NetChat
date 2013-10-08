@@ -225,7 +225,7 @@ public class ProtocolData {
 	
 	private String dataToString() {
 		StringBuilder sb = new StringBuilder();
-		int length = Integer.parseInt(header.get(1));
+		int length = Integer.parseInt(header.get(0));
 		for (int i = 0; i < length; i++)
 			sb.append((char) data[i]);
 		return sb.toString();

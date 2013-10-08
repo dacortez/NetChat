@@ -23,7 +23,6 @@ public abstract class Client extends Multiplex {
 	protected Pipe serverPipe;
 	protected Pipe p2pPipe;
 	private static final long HEART_BEAT_TIME = 10 * 1000;
-	private File file;
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
@@ -220,12 +219,14 @@ public abstract class Client extends Multiplex {
 			System.out.println("Informação inválida!");
 		return null;
 	}
+	
+	private File sendFile;
 
 	private ProtocolData transferRequest(String pathAndUserName, int index) {
 		String path = pathAndUserName.substring(0, index);
 		String receiver = pathAndUserName.substring(index + 2);		
-		file = new File(path);
-		if (file.exists()) {
+		sendFile = new File(path);
+		if (sendFile.exists()) {
 			return transferRequest(receiver);
 		}
 		else {
@@ -262,10 +263,11 @@ public abstract class Client extends Multiplex {
 		String receiver = transferOK.getHeaderLine(0);
 		String receiverHost = transferOK.getHeaderLine(1);
 		Integer receiverPierPort = Integer.parseInt(transferOK.getHeaderLine(2));
-		p2pInstantiation(receiverHost, receiverPierPort);
+		transferOK.addToHeader(sendFile.getName());
 		state = ClientState.TRANSFERING;
 		System.out.println("Iniciando transferência de arquivo...");
-		System.out.println(file.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());
+		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());
+		p2pInstantiation(receiverHost, receiverPierPort);
 		p2pPipe.send(transferOK);
 	}
 	
@@ -431,10 +433,18 @@ public abstract class Client extends Multiplex {
 	
 	// TRANSFER_OK -----------------------------------------------------------------------------
 	
+	private File receiveFile;
+	
 	private void transferOKFromPier(ProtocolData transferOK) throws IOException {
 		String sender = transferOK.getHeaderLine(3);
 		String senderHost = transferOK.getHeaderLine(4);
 		Integer senderPierPort = Integer.parseInt(transferOK.getHeaderLine(5));
+		String fileName = transferOK.getHeaderLine(6);
+		receiveFile = new File("recebido_" + fileName);
+		if (receiveFile.exists()) {
+			receiveFile.delete();
+			receiveFile.createNewFile();
+		}
 		p2pInstantiation(senderHost, senderPierPort); 
 		state = ClientState.TRANSFERING;
 		System.out.println("Recebendo arquivo de " + sender + "...");
@@ -446,16 +456,15 @@ public abstract class Client extends Multiplex {
 	private DataInputStream inFromFile;
 	
 	private void transferStart() throws IOException {
-		inFromFile = new DataInputStream(new FileInputStream(file));
+		inFromFile = new DataInputStream(new FileInputStream(sendFile));
 		transferNextBlock();
 	}
 
 	private void transferNextBlock() throws IOException {
-		byte[] fileBuffer = new byte[1000];
+		byte[] fileBuffer = new byte[16000];
 		Integer bytesRead = inFromFile.read(fileBuffer);
 		if (bytesRead > 0) {
 			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
-			fileData.addToHeader(file.getName());
 			fileData.addToHeader(bytesRead.toString());
 			fileData.setData(fileBuffer);
 			p2pPipe.send(fileData);
@@ -468,8 +477,8 @@ public abstract class Client extends Multiplex {
 	
 	private void endTransmition() throws IOException {
 		inFromFile.close();
-		file = null;
 		p2pPipe.close();
+		sendFile = null;
 		System.out.println("Finalizada transferência de arquivo!");
 		printMenu();
 	}
@@ -477,10 +486,9 @@ public abstract class Client extends Multiplex {
 	// FILE_DATA ----------------------------------------------------------------------------------
 	
 	private void fileData(ProtocolData fileData) throws IOException {
-		String fileName = fileData.getHeaderLine(0);
-		Integer length = Integer.parseInt(fileData.getHeaderLine(1));
-		File file = new File("chegada_" + fileName);
-		FileOutputStream out = new FileOutputStream(file, true);
+		Integer length = Integer.parseInt(fileData.getHeaderLine(0));
+		FileOutputStream out = new FileOutputStream(receiveFile, true);
+		//System.out.println(fileData);
 		out.write(fileData.getData(), 0, length);
 		out.close();
 		p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
@@ -497,6 +505,7 @@ public abstract class Client extends Multiplex {
 	private void transferEnd(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
 		p2pPipe.close();
+		receiveFile = null;
 		System.out.println("Arquivo recebido!");
 		printMenu();
 	}
