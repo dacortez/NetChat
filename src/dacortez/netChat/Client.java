@@ -1,6 +1,7 @@
 package dacortez.netChat;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,7 +15,7 @@ import java.util.TimerTask;
 
 public abstract class Client extends Multiplex {
 	protected String host;
-	protected Integer port;
+	protected Integer serverPort;
 	protected Integer pierPort;
 	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 	protected String userName;
@@ -26,20 +27,20 @@ public abstract class Client extends Multiplex {
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
-		int port = Integer.parseInt(args[1]);
+		int serverPort = Integer.parseInt(args[1]);
 		if (args[2].charAt(0) == 'T') {
 			System.out.println("TCP");
-			new TCPClient(host, port, 5000 + new Random().nextInt(1000)).start();
+			new TCPClient(host, serverPort, 5000 + new Random().nextInt(1000)).start();
 		}
 		else if (args[2].charAt(0) == 'U') {
 			System.out.println("UDP");
-			new UDPClient(host, port, 5000 + new Random().nextInt(1000)).start();
+			new UDPClient(host, serverPort, 5000 + new Random().nextInt(1000)).start();
 		}
 	}
 	
-	public Client(String host, int port, int pierPort) {
+	public Client(String host, int serverPort, int pierPort) {
 		this.host = host;
-		this.port = port;
+		this.serverPort = serverPort;
 		this.pierPort = pierPort;
 	}
 	
@@ -117,27 +118,29 @@ public abstract class Client extends Multiplex {
 			typingFile();
 			break;
 		case TRANSFERING:
-			System.out.println("Transferindo arquivo!");
+			transfering();
 			break;
 		case SCANNING_MENU:	
-			switchMenuOption((char) buffer.get());
+			scanningMenu((char) buffer.get());
 		}		
 	}
+	
+	// TYPING_USER --------------------------------------------------------------------------------
 
 	private void typingUser() throws IOException {
 		System.out.println("Buscando usuário no servidor...");
 		ProtocolData chatRequest = chatRequest();
 		if (chatRequest != null) {
 			serverPipe.send(chatRequest);
-			processResponseFromChatRequest();
+			serverResponseFromChatRequest();
 		} 
 		else
 			printMenu();
 	}
 	
 	private ProtocolData chatRequest() {
-		String requested = bufferToString();
-		if (requested.toLowerCase().contentEquals(this.userName)) {
+		String requested = bufferToString().toLowerCase();
+		if (requested.contentEquals(this.userName)) {
 			System.out.println("O usuário não deve ser você mesmo!");
 			return null;
 		}
@@ -147,7 +150,7 @@ public abstract class Client extends Multiplex {
 		return chatRequest;
 	}
 
-	private void processResponseFromChatRequest() throws IOException {
+	private void serverResponseFromChatRequest() throws IOException {
 		ProtocolData received = serverPipe.receive();
 		if (received.getType() == DataType.CHAT_DENIED) {
 			System.out.println("Bate-papo negado: " + received.getHeaderLine(0));
@@ -168,90 +171,13 @@ public abstract class Client extends Multiplex {
 	
 	protected abstract void p2pInstantiation(String host, Integer port) throws IOException;
 	
+	// CHATTING -----------------------------------------------------------------------------------
+	
 	private void chatting() throws IOException {
 		ProtocolData chatMsg = chatMsg();
 		if (chatMsg != null)
 			p2pPipe.send(chatMsg);
 	}
-	
-	private void typingFile() throws IOException {
-		System.out.println("Buscando usuário no servidor...");
-		ProtocolData transferRequest = transferRequest();
-		if (transferRequest != null) {
-			serverPipe.send(transferRequest);
-			processResponseFromTransferRequest();
-		} 
-		else
-			printMenu();
-	}
-	
-	private ProtocolData transferRequest() {
-		String pathAndUserName = bufferToString();
-		int index = pathAndUserName.indexOf(">>");
-		if (index > 0)
-			return transferRequest(pathAndUserName, index);
-		else 
-			System.out.println("Informação inválida!");
-		return null;
-	}
-
-	private ProtocolData transferRequest(String pathAndUserName, int index) {
-		String path = pathAndUserName.substring(0, index);
-		String userName = pathAndUserName.substring(index + 2);		
-		file = new File(path);
-		if (file.exists()) {
-			ProtocolData transferRequest = new ProtocolData(DataType.TRANSFER_REQUEST);
-			transferRequest.addToHeader(userName);
-			return transferRequest;
-		}
-		else {
-			System.out.println("Arquivo não encontrado!");
-			return null;
-		}
-	}
-	
-	private void processResponseFromTransferRequest() throws IOException {
-		ProtocolData received = serverPipe.receive();
-		if (received.getType() == DataType.TRANSFER_OK) {
-			String userName = received.getHeaderLine(0);
-			String host = received.getHeaderLine(1);
-			Integer pierPort = Integer.parseInt(received.getHeaderLine(2));
-			String path = file.getPath();
-			System.out.println("Iniciando transferência de arquivo...");
-			System.out.println(path + ">>" + userName + "@" + host + ":" + pierPort.toString());
-			transferFile(file, userName, host, pierPort);
-			printMenu();
-		}
-		else if (received.getType() == DataType.TRANSFER_DENIED) {
-			System.out.println("Transferencia negada: " + received.getHeaderLine(0));
-			printMenu();
-		}
-	}
-	
-	public void transferFile(File file, String userName, String host, Integer pierPort) throws IOException {
-		state = ClientState.TRANSFERING;
-		//p2pInstantiation(host, pierPort); 
-		FileInputStream inFromFile = new FileInputStream(file);
-		FileOutputStream outToFile = new FileOutputStream(new File("chegada.txt"));
-		byte[] fileBuffer = new byte[10];
-		Integer bytesRead = inFromFile.read(fileBuffer);
-		while (bytesRead > 0) {
-			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
-			fileData.addToHeader(file.getName());
-			fileData.addToHeader(bytesRead.toString());
-			fileData.allocateData(bytesRead);
-			for (int i = 0; i < bytesRead; i++)
-				fileData.putByte(i, fileBuffer[i]);
-			//p2pPipe.send(fileData);
-			System.out.println(fileData);
-			outToFile.write(fileData.getData());
-			bytesRead = inFromFile.read(fileBuffer);
-		}
-		inFromFile.close();
-		outToFile.close();
-	}
-
-	// Melhorar ---------------------------------------------------------
 	
 	private ProtocolData chatMsg() throws IOException {
 		String msg = bufferToString();
@@ -272,9 +198,86 @@ public abstract class Client extends Multiplex {
 		return serverPipe.receive();
 	}
 	
-	// Fim melhorar -----------------------------------------------------
+	// TYPING_FILE --------------------------------------------------------------------------------
+	
+	private void typingFile() throws IOException {
+		System.out.println("Buscando usuário no servidor...");
+		ProtocolData transferRequest = transferRequest();
+		if (transferRequest != null) {
+			serverPipe.send(transferRequest);
+			serverResponseFromTransferRequest();
+		} 
+		else
+			printMenu();
+	}
+	
+	private ProtocolData transferRequest() {
+		String pathAndUserName = bufferToString().toLowerCase();
+		int index = pathAndUserName.indexOf(">>");
+		if (index > 0)
+			return transferRequest(pathAndUserName, index);
+		else 
+			System.out.println("Informação inválida!");
+		return null;
+	}
 
-	private void switchMenuOption(char option) {
+	private ProtocolData transferRequest(String pathAndUserName, int index) {
+		String path = pathAndUserName.substring(0, index);
+		String receiver = pathAndUserName.substring(index + 2);		
+		file = new File(path);
+		if (file.exists()) {
+			return transferRequest(receiver);
+		}
+		else {
+			System.out.println("Arquivo não encontrado!");
+			return null;
+		}
+	}
+
+	private ProtocolData transferRequest(String receiver) {
+		if (receiver.contentEquals(this.userName)) {
+			System.out.println("Você não pode enviar um arquivo para você mesmo!");
+			return null;
+		}
+		else {
+			ProtocolData transferRequest = new ProtocolData(DataType.TRANSFER_REQUEST);
+			transferRequest.addToHeader(receiver);
+			transferRequest.addToHeader(this.userName);
+			return transferRequest;
+		}
+	}
+	
+	private void serverResponseFromTransferRequest() throws IOException {
+		ProtocolData received = serverPipe.receive();
+		if (received.getType() == DataType.TRANSFER_OK) {
+			transferOKFromServer(received);
+		}
+		else if (received.getType() == DataType.TRANSFER_DENIED) {
+			System.out.println("Transferencia negada: " + received.getHeaderLine(0));
+			printMenu();
+		}
+	}
+
+	private void transferOKFromServer(ProtocolData transferOK) throws IOException {
+		String receiver = transferOK.getHeaderLine(0);
+		String receiverHost = transferOK.getHeaderLine(1);
+		Integer receiverPierPort = Integer.parseInt(transferOK.getHeaderLine(2));
+		p2pInstantiation(receiverHost, receiverPierPort);
+		state = ClientState.TRANSFERING;
+		System.out.println("Iniciando transferência de arquivo...");
+		System.out.println(file.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());
+		p2pPipe.send(transferOK);
+	}
+	
+	// TRANSFERING --------------------------------------------------------------------------------
+	
+	private void transfering() {
+		System.out.println("Em transferência de arquivo!");
+	}
+	
+	// SCANNING_MENU --------------------------------------------------------------------------------
+
+	private void scanningMenu(char option) {
 		switch (option) {
 		case 'L': case 'l':
 			listUsers();
@@ -340,7 +343,9 @@ public abstract class Client extends Multiplex {
 		}
 	}
 		
-	//------------------------------------------------------------------
+	// --------------------------------------------------------------------------------------------
+	// Pier to pier communication.
+	// --------------------------------------------------------------------------------------------
 	
 	@Override
 	protected void respond(Channel channel) throws IOException {
@@ -357,7 +362,24 @@ public abstract class Client extends Multiplex {
 		else if (received.getType() == DataType.CHAT_END) {
 			chatEnd(channel);
 		}
+		else if (received.getType() == DataType.TRANSFER_OK) {
+			transferOKFromPier(received);
+		}
+		else if (received.getType() == DataType.TRANSFER_START) {
+			transferStart();
+		}
+		else if (received.getType() == DataType.FILE_DATA) {
+			fileData(received);
+		}
+		else if (received.getType() == DataType.DATA_SAVED) {
+			dataSaved();
+		}
+		else if (received.getType() == DataType.TRANSFER_END) {
+			transferEnd(channel);
+		}
 	}
+	
+	// CHAT_OK ------------------------------------------------------------------------------------
 
 	private void chatOKFromPier(ProtocolData chatOK) throws IOException {
 		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
@@ -367,11 +389,15 @@ public abstract class Client extends Multiplex {
 		state = ClientState.CHATTING;	
 	}
 	
+	// CHAT_MSG -----------------------------------------------------------------------------------
+	
 	private void chatMsg(ProtocolData chatMsg) {
 		String sender = chatMsg.getHeaderLine(0);
 		String msg = chatMsg.getHeaderLine(1);
 		System.out.println("[" + sender + "]: " + msg);
 	}
+	
+	// CHAT_FINISHED ------------------------------------------------------------------------------
 	
 	private void chatFinished(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
@@ -386,6 +412,8 @@ public abstract class Client extends Multiplex {
 		}
 	}
 	
+	// CHAT_END -----------------------------------------------------------------------------------
+	
 	private void chatEnd(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
 		p2pPipe.close();
@@ -399,5 +427,77 @@ public abstract class Client extends Multiplex {
 			sc.keyFor(selector).cancel();
 			sc.close();
 		}
+	}
+	
+	// TRANSFER_OK -----------------------------------------------------------------------------
+	
+	private void transferOKFromPier(ProtocolData transferOK) throws IOException {
+		String sender = transferOK.getHeaderLine(3);
+		String senderHost = transferOK.getHeaderLine(4);
+		Integer senderPierPort = Integer.parseInt(transferOK.getHeaderLine(5));
+		p2pInstantiation(senderHost, senderPierPort); 
+		state = ClientState.TRANSFERING;
+		System.out.println("Recebendo arquivo de " + sender + "...");
+		p2pPipe.send(new ProtocolData(DataType.TRANSFER_START));	
+	}
+	
+	// TRANSFER_START -----------------------------------------------------------------------------
+	
+	private DataInputStream inFromFile;
+	
+	private void transferStart() throws IOException {
+		inFromFile = new DataInputStream(new FileInputStream(file));
+		transferNextBlock();
+	}
+
+	private void transferNextBlock() throws IOException {
+		byte[] fileBuffer = new byte[1000];
+		Integer bytesRead = inFromFile.read(fileBuffer);
+		if (bytesRead > 0) {
+			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
+			fileData.addToHeader(file.getName());
+			fileData.addToHeader(bytesRead.toString());
+			fileData.setData(fileBuffer);
+			p2pPipe.send(fileData);
+		}
+		else {
+			p2pPipe.send(new ProtocolData(DataType.TRANSFER_END));
+			endTransmition();
+		}
+	}
+	
+	private void endTransmition() throws IOException {
+		inFromFile.close();
+		file = null;
+		p2pPipe.close();
+		System.out.println("Finalizada transferência de arquivo!");
+		printMenu();
+	}
+	
+	// FILE_DATA ----------------------------------------------------------------------------------
+	
+	private void fileData(ProtocolData fileData) throws IOException {
+		String fileName = fileData.getHeaderLine(0);
+		Integer length = Integer.parseInt(fileData.getHeaderLine(1));
+		File file = new File("chegada_" + fileName);
+		FileOutputStream out = new FileOutputStream(file, true);
+		out.write(fileData.getData(), 0, length);
+		out.close();
+		p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
+	}
+	
+	// DATA_SAVED ---------------------------------------------------------------------------------
+	
+	private void dataSaved() throws IOException {
+		transferNextBlock();
+	}
+	
+	// TRANSFER_END -------------------------------------------------------------------------------
+	
+	private void transferEnd(Channel channel) throws IOException {
+		closeIfSocketChannel(channel);
+		p2pPipe.close();
+		System.out.println("Arquivo recebido!");
+		printMenu();
 	}
 }

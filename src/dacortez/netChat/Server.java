@@ -53,21 +53,25 @@ public class Server extends Multiplex {
 			loginRequest(channel, received);
 		else if (received.getType() == DataType.USERS_REQUEST)
 			usersRequest(channel);
-		else if (received.getType() == DataType.LOGOUT_REQUEST)
-			logoutRequest(channel, received);
 		else if (received.getType() == DataType.CHAT_REQUEST)
 			chatRequest(channel, received);
 		else if (received.getType() == DataType.CHAT_END)
 			chatEnd(channel, received);
 		else if (received.getType() == DataType.TRANSFER_REQUEST)
 			transferRequest(channel, received);
+		else if (received.getType() == DataType.LOGOUT_REQUEST)
+			logoutRequest(channel, received);
 		else if (received.getType() == DataType.HEART_BEAT)
 			heartBeat();
 	}
+	
+	// CONNECTION_OK ------------------------------------------------------------------------------
 
 	private void connectionOK(Channel channel, ProtocolData connectionOK) throws IOException {
 		send(channel, connectionOK);
 	}
+	
+	// LOGIN_REQUEST ------------------------------------------------------------------------------
 
 	private void loginRequest(Channel channel, ProtocolData loginRequest) throws IOException {
 		if (logInUser(channel, loginRequest))			
@@ -115,19 +119,16 @@ public class Server extends Multiplex {
 		user.setLocked(false);
 	}
 	
+	// USERS_REQUEST ------------------------------------------------------------------------------
+	
 	private void usersRequest(Channel channel) throws IOException {
 		ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
 		for (User user: loggedInUsers)
 			usersList.addToHeader(user.toString());
 		send(channel, usersList);
 	}
-
-	private void logoutRequest(Channel channel, ProtocolData logoutRequest) throws IOException {
-		User user = getLoggedUser(logoutRequest.getHeaderLine(0));
-		if (user != null)
-			loggedInUsers.remove(user);
-		send(channel, new ProtocolData(DataType.LOGOUT_OK));
-	}
+	
+	// CHAT_REQUEST -------------------------------------------------------------------------------
 
 	private void chatRequest(Channel channel, ProtocolData chatRequest) throws IOException {
 		User requested = getLoggedUser(chatRequest.getHeaderLine(0));
@@ -147,7 +148,7 @@ public class Server extends Multiplex {
 			if (!requested.isLocked()) {
 				requested.setLocked(true); 
 				sender.setLocked(true);
-				sendChatOK(channel, requested, sender);
+				send(channel, chatOK(requested, sender));
 			}
 			else {
 				chatDenied.addToHeader("usuario bloqueado");
@@ -168,14 +169,16 @@ public class Server extends Multiplex {
 		return false;
 	}
 
-	private void sendChatOK(Channel channel, User requested, User sender) throws IOException {
+	private ProtocolData chatOK(User requested, User sender) throws IOException {
 		ProtocolData chatOK = new ProtocolData(DataType.CHAT_OK);
 		chatOK.addToHeader(requested.getHost());
 		chatOK.addToHeader(requested.getPierPort().toString());
 		chatOK.addToHeader(sender.getHost());
 		chatOK.addToHeader(sender.getPierPort().toString());
-		send(channel, chatOK);
+		return chatOK;
 	}
+	
+	// CHAT_END -----------------------------------------------------------------------------------
 	
 	private void chatEnd(Channel channel, ProtocolData chatEnd) throws IOException {
 		User user = getLoggedUser(chatEnd.getHeaderLine(0));
@@ -185,21 +188,42 @@ public class Server extends Multiplex {
 		send(channel, chatFinished);
 	}
 	
+	// TRANSFER_REQUEST ---------------------------------------------------------------------------
+	
 	private void transferRequest(Channel channel, ProtocolData transferRequest) throws IOException {
-		User user = getLoggedUser(transferRequest.getHeaderLine(0));
-		if (user != null && !user.isLocked()) {
-			ProtocolData transferOK = new ProtocolData(DataType.TRANSFER_OK);
-			transferOK.addToHeader(user.getUserName());
-			transferOK.addToHeader(user.getHost());
-			transferOK.addToHeader(user.getPierPort().toString());
-			send(channel, transferOK);
+		User receiver = getLoggedUser(transferRequest.getHeaderLine(0));
+		User sender = getLoggedUser(transferRequest.getHeaderLine(1));
+		if (receiver != null && !receiver.isLocked()) {
+			send(channel, transferOK(receiver, sender));
 		} 
 		else {
 			ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
-			transferDenied.addToHeader("nao disponivel");
+			transferDenied.addToHeader("usuario nao disponivel");
 			send(channel, transferDenied);
 		}
 	}
+
+	private ProtocolData transferOK(User receiver, User sender) {
+		ProtocolData transferOK = new ProtocolData(DataType.TRANSFER_OK);
+		transferOK.addToHeader(receiver.getUserName());
+		transferOK.addToHeader(receiver.getHost());
+		transferOK.addToHeader(receiver.getPierPort().toString());
+		transferOK.addToHeader(sender.getUserName());
+		transferOK.addToHeader(sender.getHost());
+		transferOK.addToHeader(sender.getPierPort().toString());
+		return transferOK;
+	}
+	
+	// LOGOUT_REQUEST -----------------------------------------------------------------------------
+	
+	private void logoutRequest(Channel channel, ProtocolData logoutRequest) throws IOException {
+		User user = getLoggedUser(logoutRequest.getHeaderLine(0));
+		if (user != null)
+			loggedInUsers.remove(user);
+		send(channel, new ProtocolData(DataType.LOGOUT_OK));
+	}
+	
+	// HEART_BEAT ---------------------------------------------------------------------------------
 	
 	private void heartBeat() {
 		System.out.println("Heart beat received");

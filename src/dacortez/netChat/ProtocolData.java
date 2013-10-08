@@ -17,6 +17,10 @@ public class ProtocolData {
 		return data;
 	}
 	
+	public void setData(byte[] data) {
+		this.data = data;
+	}
+	
 	public ProtocolData(DataType type) {
 		header = new ArrayList<String>();
 		this.type = type;
@@ -159,14 +163,6 @@ public class ProtocolData {
 		return header.get(index);
 	}
 	
-	public void allocateData(int size) {
-		data = new byte[size];
-	}
-	
-	public void putByte(int index, byte b) {
-		data[index] = b;
-	}
-	
 	private DataType selectDataType(String value) {
 		if (value.contentEquals(DataType.CONNECTION_OK.toString()))
 			return DataType.CONNECTION_OK;
@@ -202,8 +198,14 @@ public class ProtocolData {
 			return DataType.TRANSFER_OK;
 		if (value.contentEquals(DataType.TRANSFER_DENIED.toString()))
 			return DataType.TRANSFER_DENIED;
+		if (value.contentEquals(DataType.TRANSFER_START.toString()))
+			return DataType.TRANSFER_START;
 		if (value.contentEquals(DataType.FILE_DATA.toString()))
 			return DataType.FILE_DATA;
+		if (value.contentEquals(DataType.DATA_SAVED.toString()))
+			return DataType.DATA_SAVED;
+		if (value.contentEquals(DataType.TRANSFER_END.toString()))
+			return DataType.TRANSFER_END;
 		if (value.contentEquals(DataType.HEART_BEAT.toString()))
 			return DataType.HEART_BEAT;
 		return null;
@@ -216,14 +218,16 @@ public class ProtocolData {
 		for (String line: header)
 			sb.append(line).append("\r\n");
 		sb.append("\r\n");
-		sb.append(dataToString());
+		if (type == DataType.FILE_DATA)
+			sb.append(dataToString());
 		return sb.toString();
 	}
 	
 	private String dataToString() {
 		StringBuilder sb = new StringBuilder();
-		for (byte b: data)
-			sb.append((char) b);
+		int length = Integer.parseInt(header.get(1));
+		for (int i = 0; i < length; i++)
+			sb.append((char) data[i]);
 		return sb.toString();
 	}
 }
