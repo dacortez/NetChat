@@ -258,7 +258,7 @@ public abstract class Client extends Multiplex {
 			printMenu();
 		}
 	}
-
+	
 	private void transferOKFromServer(ProtocolData transferOK) throws IOException {
 		String receiver = transferOK.getHeaderLine(0);
 		String receiverHost = transferOK.getHeaderLine(1);
@@ -461,13 +461,19 @@ public abstract class Client extends Multiplex {
 	}
 
 	private void transferNextBlock() throws IOException {
-		byte[] fileBuffer = new byte[16000];
+		byte[] fileBuffer = new byte[512];
 		Integer bytesRead = inFromFile.read(fileBuffer);
 		if (bytesRead > 0) {
 			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
 			fileData.addToHeader(bytesRead.toString());
-			fileData.setData(fileBuffer);
+			fileData.copyData(fileBuffer, bytesRead);	
 			p2pPipe.send(fileData);
+//			try {
+//				Thread.sleep(1000);
+//			} catch (InterruptedException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
 		}
 		else {
 			p2pPipe.send(new ProtocolData(DataType.TRANSFER_END));
@@ -489,7 +495,16 @@ public abstract class Client extends Multiplex {
 		Integer length = Integer.parseInt(fileData.getHeaderLine(0));
 		FileOutputStream out = new FileOutputStream(receiveFile, true);
 		//System.out.println(fileData);
-		out.write(fileData.getData(), 0, length);
+		
+		try {
+			out.write(fileData.getData(), 0, length);
+			//out.write(fileData.getData(), 0, fileData.getData().length);
+		}
+		catch (IndexOutOfBoundsException ex) {
+			System.out.println("** bytesRead = " + length);
+			System.out.println("** data.length = " + fileData.getData().length);
+		}
+		
 		out.close();
 		p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
 	}

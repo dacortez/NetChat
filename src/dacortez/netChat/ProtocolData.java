@@ -16,11 +16,7 @@ public class ProtocolData {
 	public byte[] getData() {
 		return data;
 	}
-	
-	public void setData(byte[] data) {
-		this.data = data;
-	}
-	
+		
 	public ProtocolData(DataType type) {
 		header = new ArrayList<String>();
 		this.type = type;
@@ -229,5 +225,11 @@ public class ProtocolData {
 		for (int i = 0; i < length; i++)
 			sb.append((char) data[i]);
 		return sb.toString();
+	}
+
+	public void copyData(byte[] buffer, int len) {
+		data = new byte[len];
+		for (int i = 0; i < len; i++)
+			data[i] = buffer[i];
 	}
 }
