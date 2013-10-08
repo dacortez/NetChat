@@ -7,7 +7,7 @@ public class User {
 	private String host = null;
 	private ConnectionType type;
 	private boolean locked;
-	private Integer clientPort;
+	private Integer pierPort;
 	
 	public String getName() {
 		return name;
@@ -57,12 +57,12 @@ public class User {
 		this.locked = locked;
 	}
 
-	public Integer getClientPort() {
-		return clientPort;
+	public Integer getPierPort() {
+		return pierPort;
 	}
 
-	public void setClientPort(int clientPort) {
-		this.clientPort = clientPort;
+	public void setPierPort(int pierPort) {
+		this.pierPort = pierPort;
 	}
 
 	public User(String name, String userName, String passwordHash) {
@@ -83,7 +83,7 @@ public class User {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(name).append(" (").append(userName).append(") @ ");
-		sb.append(host).append(": ").append(type).append("/").append(clientPort);
+		sb.append(host).append(": ").append(type).append("/").append(pierPort);
 		sb.append(" [").append(locked).append("]");
 		return sb.toString();
 	}

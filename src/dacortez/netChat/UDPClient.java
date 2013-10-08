@@ -5,14 +5,14 @@ import java.nio.channels.SelectionKey;
 
 public class UDPClient extends Client {
 
-	public UDPClient(String host, int port, int clientPort) throws IOException {
-		super(host, port, clientPort);
+	public UDPClient(String host, int port, int pierPort) throws IOException {
+		super(host, port, pierPort);
 		serverPipe = new UDPPipe(host, port);
 	}
 
 	@Override
 	protected void registerChannelsWithSelector() throws IOException {
-		setDatagramChannel(clientPort);
+		setDatagramChannel(pierPort);
 		datagramChannel.register(selector, SelectionKey.OP_READ);
 		setSelectableChannel();
 		stdin.register(selector, SelectionKey.OP_READ);

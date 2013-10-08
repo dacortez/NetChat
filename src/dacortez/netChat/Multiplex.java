@@ -223,4 +223,13 @@ public abstract class Multiplex {
 			((DatagramChannel) channel).write(buffer);
 		//System.out.println("Sent " + buffer.limit() + " from " + channel);
 	}
+	
+	protected String bufferToString() {
+		StringBuilder sb = new StringBuilder();
+		while (buffer.hasRemaining())
+		     sb.append((char) buffer.get());
+		int length = sb.length();
+		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
+		return sb.toString();
+	}
 }

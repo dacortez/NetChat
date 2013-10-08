@@ -59,6 +59,8 @@ public class Server extends Multiplex {
 			chatRequest(channel, received);
 		else if (received.getType() == DataType.CHAT_END)
 			chatEnd(channel, received);
+		else if (received.getType() == DataType.TRANSFER_REQUEST)
+			transferRequest(channel, received);
 		else if (received.getType() == DataType.HEART_BEAT)
 			heartBeat();
 	}
@@ -108,8 +110,8 @@ public class Server extends Multiplex {
 			InetAddress inet = ((InetSocketAddress) address).getAddress(); 
 			user.setHost(inet.getHostAddress());
 		}
-		Integer clientPort = Integer.parseInt(loginRequest.getHeaderLine(2));
-		user.setClientPort(clientPort);
+		Integer pierPort = Integer.parseInt(loginRequest.getHeaderLine(2));
+		user.setPierPort(pierPort);
 		user.setLocked(false);
 	}
 	
@@ -169,9 +171,9 @@ public class Server extends Multiplex {
 	private void sendChatOK(Channel channel, User requested, User sender) throws IOException {
 		ProtocolData chatOK = new ProtocolData(DataType.CHAT_OK);
 		chatOK.addToHeader(requested.getHost());
-		chatOK.addToHeader(requested.getClientPort().toString());
+		chatOK.addToHeader(requested.getPierPort().toString());
 		chatOK.addToHeader(sender.getHost());
-		chatOK.addToHeader(sender.getClientPort().toString());
+		chatOK.addToHeader(sender.getPierPort().toString());
 		send(channel, chatOK);
 	}
 	
@@ -181,6 +183,22 @@ public class Server extends Multiplex {
 		ProtocolData chatFinished = new ProtocolData(DataType.CHAT_FINISHED);
 		chatFinished.addToHeader(user.getUserName());
 		send(channel, chatFinished);
+	}
+	
+	private void transferRequest(Channel channel, ProtocolData transferRequest) throws IOException {
+		User user = getLoggedUser(transferRequest.getHeaderLine(0));
+		if (user != null && !user.isLocked()) {
+			ProtocolData transferOK = new ProtocolData(DataType.TRANSFER_OK);
+			transferOK.addToHeader(user.getUserName());
+			transferOK.addToHeader(user.getHost());
+			transferOK.addToHeader(user.getPierPort().toString());
+			send(channel, transferOK);
+		} 
+		else {
+			ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
+			transferDenied.addToHeader("nao disponivel");
+			send(channel, transferDenied);
+		}
 	}
 	
 	private void heartBeat() {

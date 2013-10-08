@@ -5,14 +5,14 @@ import java.nio.channels.SelectionKey;
 
 public class TCPClient extends Client {
 	
-	public TCPClient(String host, int port, int clientPort) throws IOException {
-		super(host, port, clientPort);
+	public TCPClient(String host, int port, int pierPort) throws IOException {
+		super(host, port, pierPort);
 		serverPipe = new TCPPipe(host, port);
 	}
 	
 	@Override
 	protected void registerChannelsWithSelector() throws IOException {
-		setServerSocketChannel(clientPort);
+		setServerSocketChannel(pierPort);
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 		setSelectableChannel();
 		stdin.register(selector, SelectionKey.OP_READ);

@@ -1,8 +1,11 @@
 package dacortez.netChat;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.File;
 import java.nio.channels.Channel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
@@ -12,13 +15,14 @@ import java.util.TimerTask;
 public abstract class Client extends Multiplex {
 	protected String host;
 	protected Integer port;
-	protected Integer clientPort;
+	protected Integer pierPort;
 	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 	protected String userName;
 	protected ClientState state;
 	protected Pipe serverPipe;
 	protected Pipe p2pPipe;
 	private static final long HEART_BEAT_TIME = 10 * 1000;
+	private File file;
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
@@ -33,10 +37,10 @@ public abstract class Client extends Multiplex {
 		}
 	}
 	
-	public Client(String host, int port, int clientPort) {
+	public Client(String host, int port, int pierPort) {
 		this.host = host;
 		this.port = port;
-		this.clientPort = clientPort;
+		this.pierPort = pierPort;
 	}
 	
 	protected void start() throws IOException {
@@ -87,15 +91,15 @@ public abstract class Client extends Multiplex {
 		ProtocolData loginRequest = new ProtocolData(DataType.LOGIN_REQUEST);
 		loginRequest.addToHeader(userName);
 		loginRequest.addToHeader(password);
-		loginRequest.addToHeader(clientPort.toString());
+		loginRequest.addToHeader(pierPort.toString());
 		return loginRequest;
 	}
 	
 	protected void printMenu() {
-		System.out.println("(U) Lista usuários logados");
+		System.out.println("(L) Lista usuários logados");
 		System.out.println("(B) Iniciar bate-papo com usuário");
-		System.out.println("(E) Enviar arquivo para usuário");
-		System.out.println("(L) Fazer logout");
+		System.out.println("(A) Enviar arquivo para usuário");
+		System.out.println("(Q) Fazer logout");
 		System.out.println("Escolha uma das opções:");
 		state = ClientState.SCANNING_MENU;
 	}
@@ -110,6 +114,10 @@ public abstract class Client extends Multiplex {
 			chatting();
 			break;
 		case TYPING_FILE:
+			typingFile();
+			break;
+		case TRANSFERING:
+			System.out.println("Transferindo arquivo!");
 			break;
 		case SCANNING_MENU:	
 			switchMenuOption((char) buffer.get());
@@ -123,16 +131,16 @@ public abstract class Client extends Multiplex {
 			serverPipe.send(chatRequest);
 			processResponseFromChatRequest();
 		} 
-		else {
-			System.out.println("O usuário não deve ser você mesmo.");
+		else
 			printMenu();
-		}
 	}
 	
 	private ProtocolData chatRequest() {
 		String requested = bufferToString();
-		if (requested.toLowerCase().contentEquals(this.userName))
+		if (requested.toLowerCase().contentEquals(this.userName)) {
+			System.out.println("O usuário não deve ser você mesmo!");
 			return null;
+		}
 		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
 		chatRequest.addToHeader(requested); // requested
 		chatRequest.addToHeader(this.userName); // sender
@@ -142,8 +150,7 @@ public abstract class Client extends Multiplex {
 	private void processResponseFromChatRequest() throws IOException {
 		ProtocolData received = serverPipe.receive();
 		if (received.getType() == DataType.CHAT_DENIED) {
-			System.out.print("Bate-papo negado: ");
-			System.out.println(received.getHeaderLine(0));
+			System.out.println("Bate-papo negado: " + received.getHeaderLine(0));
 			printMenu();
 		}
 		else if (received.getType() == DataType.CHAT_OK)
@@ -153,8 +160,8 @@ public abstract class Client extends Multiplex {
 	private void chatOKFromServer(ProtocolData chatOK) throws IOException {
 		System.out.println("Bate-papo aceito (digite 'q()' para finalizar):\n");
 		String host = chatOK.getHeaderLine(0);
-		Integer port = Integer.parseInt(chatOK.getHeaderLine(1));
-		p2pInstantiation(host, port); 
+		Integer pierPort = Integer.parseInt(chatOK.getHeaderLine(1));
+		p2pInstantiation(host, pierPort); 
 		state = ClientState.CHATTING;
 		p2pPipe.send(chatOK);	
 	}
@@ -165,6 +172,83 @@ public abstract class Client extends Multiplex {
 		ProtocolData chatMsg = chatMsg();
 		if (chatMsg != null)
 			p2pPipe.send(chatMsg);
+	}
+	
+	private void typingFile() throws IOException {
+		System.out.println("Buscando usuário no servidor...");
+		ProtocolData transferRequest = transferRequest();
+		if (transferRequest != null) {
+			serverPipe.send(transferRequest);
+			processResponseFromTransferRequest();
+		} 
+		else
+			printMenu();
+	}
+	
+	private ProtocolData transferRequest() {
+		String pathAndUserName = bufferToString();
+		int index = pathAndUserName.indexOf(">>");
+		if (index > 0)
+			return transferRequest(pathAndUserName, index);
+		else 
+			System.out.println("Informação inválida!");
+		return null;
+	}
+
+	private ProtocolData transferRequest(String pathAndUserName, int index) {
+		String path = pathAndUserName.substring(0, index);
+		String userName = pathAndUserName.substring(index + 2);		
+		file = new File(path);
+		if (file.exists()) {
+			ProtocolData transferRequest = new ProtocolData(DataType.TRANSFER_REQUEST);
+			transferRequest.addToHeader(userName);
+			return transferRequest;
+		}
+		else {
+			System.out.println("Arquivo não encontrado!");
+			return null;
+		}
+	}
+	
+	private void processResponseFromTransferRequest() throws IOException {
+		ProtocolData received = serverPipe.receive();
+		if (received.getType() == DataType.TRANSFER_OK) {
+			String userName = received.getHeaderLine(0);
+			String host = received.getHeaderLine(1);
+			Integer pierPort = Integer.parseInt(received.getHeaderLine(2));
+			String path = file.getPath();
+			System.out.println("Iniciando transferência de arquivo...");
+			System.out.println(path + ">>" + userName + "@" + host + ":" + pierPort.toString());
+			transferFile(file, userName, host, pierPort);
+			printMenu();
+		}
+		else if (received.getType() == DataType.TRANSFER_DENIED) {
+			System.out.println("Transferencia negada: " + received.getHeaderLine(0));
+			printMenu();
+		}
+	}
+	
+	public void transferFile(File file, String userName, String host, Integer pierPort) throws IOException {
+		state = ClientState.TRANSFERING;
+		//p2pInstantiation(host, pierPort); 
+		FileInputStream inFromFile = new FileInputStream(file);
+		FileOutputStream outToFile = new FileOutputStream(new File("chegada.txt"));
+		byte[] fileBuffer = new byte[10];
+		Integer bytesRead = inFromFile.read(fileBuffer);
+		while (bytesRead > 0) {
+			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
+			fileData.addToHeader(file.getName());
+			fileData.addToHeader(bytesRead.toString());
+			fileData.allocateData(bytesRead);
+			for (int i = 0; i < bytesRead; i++)
+				fileData.putByte(i, fileBuffer[i]);
+			//p2pPipe.send(fileData);
+			System.out.println(fileData);
+			outToFile.write(fileData.getData());
+			bytesRead = inFromFile.read(fileBuffer);
+		}
+		inFromFile.close();
+		outToFile.close();
 	}
 
 	// Melhorar ---------------------------------------------------------
@@ -192,19 +276,19 @@ public abstract class Client extends Multiplex {
 
 	private void switchMenuOption(char option) {
 		switch (option) {
-		case 'U':
+		case 'L': case 'l':
 			listUsers();
 			printMenu();
 			break;
-		case 'B':
+		case 'B': case 'b':
 			System.out.println("Informe o Username do usuário:");
 			state = ClientState.TYPING_USER;
 			break;
-		case 'E':
-			System.out.println("Opção não implementada!");
-			printMenu();
+		case 'A': case 'a':
+			System.out.println("Informe arquivo e usuário (path>>username):");
+			state = ClientState.TYPING_FILE;
 			break;
-		case 'L':
+		case 'Q': case 'q':
 			if (logout()) {
 				stdinPipe.finalize();
 				closeSelector();
@@ -255,15 +339,8 @@ public abstract class Client extends Multiplex {
 			e.printStackTrace();
 		}
 	}
-	
-	private String bufferToString() {
-		StringBuilder sb = new StringBuilder();
-		while (buffer.hasRemaining())
-		     sb.append((char) buffer.get());
-		int length = sb.length();
-		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
-		return sb.toString();
-	}
+		
+	//------------------------------------------------------------------
 	
 	@Override
 	protected void respond(Channel channel) throws IOException {
@@ -285,8 +362,8 @@ public abstract class Client extends Multiplex {
 	private void chatOKFromPier(ProtocolData chatOK) throws IOException {
 		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
 		String host = chatOK.getHeaderLine(2);
-		Integer port = Integer.parseInt(chatOK.getHeaderLine(3));
-		p2pInstantiation(host, port); 
+		Integer pierPort = Integer.parseInt(chatOK.getHeaderLine(3));
+		p2pInstantiation(host, pierPort); 
 		state = ClientState.CHATTING;	
 	}
 	
@@ -315,7 +392,7 @@ public abstract class Client extends Multiplex {
 		System.out.println("Bate-papo-finalizado!");
 		printMenu();
 	}
-
+	
 	private void closeIfSocketChannel(Channel channel) throws IOException {
 		if (channel instanceof SocketChannel) {
 			SocketChannel sc = (SocketChannel) channel;
