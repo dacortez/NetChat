@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.Timer;
 
 public abstract class Multiplex {
-	protected final ByteBuffer buffer = ByteBuffer.allocate(16384);
+	protected ByteBuffer buffer = ByteBuffer.allocate(10000);
 	protected SystemInPipe stdinPipe;
 	protected Selector selector;
 	protected ServerSocketChannel serverSocketChannel;
@@ -158,7 +158,7 @@ public abstract class Multiplex {
 	
 	private boolean readTCP(SocketChannel channel) throws IOException {
 		buffer.clear();
-		channel.read(buffer); 
+		channel.read(buffer);
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
 		//System.out.println("Read " + buffer.limit() + " from TCP " + channel);
@@ -231,5 +231,15 @@ public abstract class Multiplex {
 		int length = sb.length();
 		if (length > 0 && sb.charAt(length - 1) == '\n') sb.deleteCharAt(length - 1);
 		return sb.toString();
+	}
+	
+	protected boolean testProtocol() {
+		if (buffer.limit() >= 5) {
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < 5; i++)
+				sb.append((char) buffer.get(i));
+			return sb.toString().contentEquals("EP2P/");
+		}
+		return false;
 	}
 }

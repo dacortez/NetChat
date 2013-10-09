@@ -258,15 +258,17 @@ public abstract class Client extends Multiplex {
 			printMenu();
 		}
 	}
-	
+		
 	private void transferOKFromServer(ProtocolData transferOK) throws IOException {
 		String receiver = transferOK.getHeaderLine(0);
 		String receiverHost = transferOK.getHeaderLine(1);
 		Integer receiverPierPort = Integer.parseInt(transferOK.getHeaderLine(2));
+		Long fileSize = sendFile.length();
 		transferOK.addToHeader(sendFile.getName());
+		transferOK.addToHeader(fileSize.toString());
 		state = ClientState.TRANSFERING;
 		System.out.println("Iniciando transferência de arquivo...");
-		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());
+		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());		
 		p2pInstantiation(receiverHost, receiverPierPort);
 		p2pPipe.send(transferOK);
 	}
@@ -349,8 +351,16 @@ public abstract class Client extends Multiplex {
 	// Pier to pier communication.
 	// --------------------------------------------------------------------------------------------
 	
+	//private ProtocolData lastSent = null;
+	
 	@Override
 	protected void respond(Channel channel) throws IOException {
+		
+		if (!testProtocol()) {
+			saveData();
+			return;
+		}
+		
 		ProtocolData received = new ProtocolData(buffer);
 		if (received.getType() == DataType.CHAT_OK) {
 			chatOKFromPier(received);
@@ -370,14 +380,8 @@ public abstract class Client extends Multiplex {
 		else if (received.getType() == DataType.TRANSFER_START) {
 			transferStart();
 		}
-		else if (received.getType() == DataType.FILE_DATA) {
-			fileData(received);
-		}
-		else if (received.getType() == DataType.DATA_SAVED) {
-			dataSaved();
-		}
 		else if (received.getType() == DataType.TRANSFER_END) {
-			transferEnd(channel);
+			transferEnd();
 		}
 	}
 	
@@ -434,94 +438,74 @@ public abstract class Client extends Multiplex {
 	// TRANSFER_OK -----------------------------------------------------------------------------
 	
 	private File receiveFile;
+	private Long totalSize;
 	
 	private void transferOKFromPier(ProtocolData transferOK) throws IOException {
 		String sender = transferOK.getHeaderLine(3);
 		String senderHost = transferOK.getHeaderLine(4);
 		Integer senderPierPort = Integer.parseInt(transferOK.getHeaderLine(5));
 		String fileName = transferOK.getHeaderLine(6);
-		receiveFile = new File("recebido_" + fileName);
+		totalSize = Long.parseLong(transferOK.getHeaderLine(7));
+		receiveFile = new File("r_" + fileName);
 		if (receiveFile.exists()) {
 			receiveFile.delete();
 			receiveFile.createNewFile();
-		}
-		p2pInstantiation(senderHost, senderPierPort); 
+		} 
 		state = ClientState.TRANSFERING;
-		System.out.println("Recebendo arquivo de " + sender + "...");
-		p2pPipe.send(new ProtocolData(DataType.TRANSFER_START));	
+		System.out.println("Recebendo arquivo de " + sender + "@" + senderHost + ":" + senderPierPort);
+		p2pInstantiation(senderHost, senderPierPort);
+		ProtocolData transferStart = new ProtocolData(DataType.TRANSFER_START);
+		p2pPipe.send(transferStart);	
 	}
 	
 	// TRANSFER_START -----------------------------------------------------------------------------
 	
-	private DataInputStream inFromFile;
-	
 	private void transferStart() throws IOException {
-		inFromFile = new DataInputStream(new FileInputStream(sendFile));
-		transferNextBlock();
-	}
-
-	private void transferNextBlock() throws IOException {
-		byte[] fileBuffer = new byte[512];
+		DataInputStream inFromFile = new DataInputStream(new FileInputStream(sendFile));
+		byte[] fileBuffer = new byte[10000];
 		Integer bytesRead = inFromFile.read(fileBuffer);
-		if (bytesRead > 0) {
-			ProtocolData fileData = new ProtocolData(DataType.FILE_DATA);
-			fileData.addToHeader(bytesRead.toString());
-			fileData.copyData(fileBuffer, bytesRead);	
-			p2pPipe.send(fileData);
-//			try {
-//				Thread.sleep(1000);
-//			} catch (InterruptedException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
+		int i = 0;
+		while (bytesRead > 0) {
+			p2pPipe.send(fileBuffer);
+			System.out.println("Pacote enviado = " + bytesRead + " | " + (++i));
+			bytesRead = inFromFile.read(fileBuffer);
 		}
-		else {
-			p2pPipe.send(new ProtocolData(DataType.TRANSFER_END));
-			endTransmition();
-		}
+		inFromFile.close();
+		// Enviar ao servidor msg que acabou.
+		// O servidor manda a msg para o receiver para sair do estado de transfering.
+		//ProtocolData transferEnd = new ProtocolData(DataType.TRANSFER_END);
+		//p2pPipe.send(transferEnd);
+		transferEnd();
 	}
 	
-	private void endTransmition() throws IOException {
-		inFromFile.close();
+	// TRANSFER_END ------------------------------------------------------------------------------
+	
+	private void transferEnd() throws IOException {
 		p2pPipe.close();
-		sendFile = null;
 		System.out.println("Finalizada transferência de arquivo!");
 		printMenu();
 	}
 	
 	// FILE_DATA ----------------------------------------------------------------------------------
 	
-	private void fileData(ProtocolData fileData) throws IOException {
-		Integer length = Integer.parseInt(fileData.getHeaderLine(0));
+	private int totalWritten = 0;
+	
+	private void saveData() throws IOException {
 		FileOutputStream out = new FileOutputStream(receiveFile, true);
-		//System.out.println(fileData);
-		
-		try {
-			out.write(fileData.getData(), 0, length);
-			//out.write(fileData.getData(), 0, fileData.getData().length);
+		int limit = buffer.limit();
+		if (totalWritten + limit <= totalSize) {
+			out.write(buffer.array(), 0, limit);
+			totalWritten += limit;
+			out.close();
+			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
 		}
-		catch (IndexOutOfBoundsException ex) {
-			System.out.println("** bytesRead = " + length);
-			System.out.println("** data.length = " + fileData.getData().length);
+		else {
+			out.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
+			out.flush();
+			totalWritten += totalSize - totalWritten;
+			out.close();
+			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
+			transferEnd();
 		}
-		
-		out.close();
-		p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
-	}
-	
-	// DATA_SAVED ---------------------------------------------------------------------------------
-	
-	private void dataSaved() throws IOException {
-		transferNextBlock();
-	}
-	
-	// TRANSFER_END -------------------------------------------------------------------------------
-	
-	private void transferEnd(Channel channel) throws IOException {
-		closeIfSocketChannel(channel);
-		p2pPipe.close();
-		receiveFile = null;
-		System.out.println("Arquivo recebido!");
-		printMenu();
 	}
 }

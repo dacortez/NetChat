@@ -7,7 +7,7 @@ import java.net.InetAddress;
 import java.util.Random;
 
 public class UDPPipe implements Pipe {
-	private final byte[] buffer = new byte[16384];
+	private final byte[] buffer = new byte[10000];
 	private DatagramSocket socket;
 	private InetAddress inet;
 	private int port;
@@ -23,6 +23,12 @@ public class UDPPipe implements Pipe {
 		byte[]  array = data.toByteArray();
 		DatagramPacket packet = new DatagramPacket(array, array.length, inet, port);
 		socket.send(packet); 
+	}
+	
+	@Override
+	public void send(byte[] data) throws IOException {
+		DatagramPacket packet = new DatagramPacket(data, data.length, inet, port);
+		socket.send(packet);
 	}
 	
 	@Override

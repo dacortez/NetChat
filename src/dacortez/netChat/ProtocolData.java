@@ -23,10 +23,19 @@ public class ProtocolData {
 	}
 	
 	public ProtocolData(ByteBuffer buffer) {
-		header = new ArrayList<String>();
-		int i = setType(buffer);
-		i = setHeader(buffer, i);
-		setData(buffer, i); 
+		try {
+			header = new ArrayList<String>();
+			int i = setType(buffer);
+			i = setHeader(buffer, i);
+			setData(buffer, i);
+		}
+		catch (Exception e) {
+			this.type = DataType.DATA_WRONG;
+			header = new ArrayList<String>();
+			//data = new byte[buffer.limit()];
+			//for (int j = 0; j < buffer.limit(); j++)
+			//	data[j] = buffer.get(j);
+		}
 	}
 
 	private int setType(ByteBuffer buffer) {
@@ -159,6 +168,22 @@ public class ProtocolData {
 		return header.get(index);
 	}
 	
+	public void copyData(byte[] buffer, int len) {
+		data = new byte[len];
+		for (int i = 0; i < len; i++)
+			data[i] = buffer[i];
+	}
+
+	public void appendData(byte[] buffer) {
+		byte[] newData = new byte[data.length + buffer.length];
+		int j = 0;
+		for (int i = 0; i < data.length; i++)
+			newData[j++] = data[i];
+		for (int i = 0; i < buffer.length; i++)
+			newData[j++] = buffer[i];
+		data = newData;
+	}
+	
 	private DataType selectDataType(String value) {
 		if (value.contentEquals(DataType.CONNECTION_OK.toString()))
 			return DataType.CONNECTION_OK;
@@ -200,6 +225,10 @@ public class ProtocolData {
 			return DataType.FILE_DATA;
 		if (value.contentEquals(DataType.DATA_SAVED.toString()))
 			return DataType.DATA_SAVED;
+		if (value.contentEquals(DataType.SEND_AGAIN.toString()))
+			return DataType.SEND_AGAIN;
+		if (value.contentEquals(DataType.DATA_WRONG.toString()))
+			return DataType.DATA_WRONG;
 		if (value.contentEquals(DataType.TRANSFER_END.toString()))
 			return DataType.TRANSFER_END;
 		if (value.contentEquals(DataType.HEART_BEAT.toString()))
@@ -225,11 +254,5 @@ public class ProtocolData {
 		for (int i = 0; i < length; i++)
 			sb.append((char) data[i]);
 		return sb.toString();
-	}
-
-	public void copyData(byte[] buffer, int len) {
-		data = new byte[len];
-		for (int i = 0; i < len; i++)
-			data[i] = buffer[i];
 	}
 }
