@@ -23,19 +23,10 @@ public class ProtocolData {
 	}
 	
 	public ProtocolData(ByteBuffer buffer) {
-		try {
-			header = new ArrayList<String>();
-			int i = setType(buffer);
-			i = setHeader(buffer, i);
-			setData(buffer, i);
-		}
-		catch (Exception e) {
-			this.type = DataType.DATA_WRONG;
-			header = new ArrayList<String>();
-			//data = new byte[buffer.limit()];
-			//for (int j = 0; j < buffer.limit(); j++)
-			//	data[j] = buffer.get(j);
-		}
+		header = new ArrayList<String>();
+		int i = setType(buffer);
+		i = setHeader(buffer, i);
+		setData(buffer, i);
 	}
 
 	private int setType(ByteBuffer buffer) {
@@ -227,8 +218,6 @@ public class ProtocolData {
 			return DataType.DATA_SAVED;
 		if (value.contentEquals(DataType.SEND_AGAIN.toString()))
 			return DataType.SEND_AGAIN;
-		if (value.contentEquals(DataType.DATA_WRONG.toString()))
-			return DataType.DATA_WRONG;
 		if (value.contentEquals(DataType.TRANSFER_END.toString()))
 			return DataType.TRANSFER_END;
 		if (value.contentEquals(DataType.HEART_BEAT.toString()))

@@ -25,7 +25,7 @@ public abstract class Multiplex {
 	protected ServerSocketChannel serverSocketChannel;
 	protected DatagramChannel datagramChannel;
 	protected SelectableChannel stdin;
-	protected Timer timer = new Timer();
+	protected Timer timer;
 	protected SocketAddress address;
 	
 	public void run() {
@@ -233,7 +233,7 @@ public abstract class Multiplex {
 		return sb.toString();
 	}
 	
-	protected boolean testProtocol() {
+	protected boolean isProtocolData() {
 		if (buffer.limit() >= 5) {
 			StringBuilder sb = new StringBuilder();
 			for (int i = 0; i < 5; i++)

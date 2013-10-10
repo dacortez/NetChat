@@ -11,6 +11,7 @@ import java.nio.channels.Channel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Random;
+import java.util.Timer;
 import java.util.TimerTask;
 
 public abstract class Client extends Multiplex {
@@ -43,7 +44,7 @@ public abstract class Client extends Multiplex {
 		this.pierPort = pierPort;
 	}
 	
-	protected void start() throws IOException {
+	public void start() throws IOException {
 		ProtocolData connectionOK = new ProtocolData(DataType.CONNECTION_OK);
 		serverPipe.send(connectionOK);
 		ProtocolData received = serverPipe.receive();
@@ -54,6 +55,7 @@ public abstract class Client extends Multiplex {
 	
 	@Override
 	protected void setTimer() {
+		timer = new Timer();
 		timer.scheduleAtFixedRate(new TimerTask() {
 			@Override
 			public void run() {
@@ -95,7 +97,7 @@ public abstract class Client extends Multiplex {
 		return loginRequest;
 	}
 	
-	protected void printMenu() {
+	private void printMenu() {
 		System.out.println("(L) Lista usuários logados");
 		System.out.println("(B) Iniciar bate-papo com usuário");
 		System.out.println("(A) Enviar arquivo para usuário");
@@ -220,7 +222,7 @@ public abstract class Client extends Multiplex {
 		return null;
 	}
 	
-	private File sendFile;
+	protected File sendFile;
 
 	private ProtocolData transferRequest(String pathAndUserName, int index) {
 		String path = pathAndUserName.substring(0, index);
@@ -307,7 +309,7 @@ public abstract class Client extends Multiplex {
 		}
 	}
 
-	protected void listUsers() {
+	private void listUsers() {
 		try {
 			serverPipe.send(new ProtocolData(DataType.USERS_REQUEST));
 			ProtocolData received = serverPipe.receive();
@@ -322,7 +324,7 @@ public abstract class Client extends Multiplex {
 		}
 	}
 	
-	protected boolean logout() {
+	private boolean logout() {
 		try {
 			ProtocolData logoutRequest = new ProtocolData(DataType.LOGOUT_REQUEST);
 			logoutRequest.addToHeader(userName);
@@ -330,13 +332,19 @@ public abstract class Client extends Multiplex {
 			ProtocolData received = serverPipe.receive();
 			if (received.getType() == DataType.LOGOUT_OK) {
 				System.out.println("Até a próxima...");
-				timer.cancel();
+				cancelTimer(timer);
 				return true;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		return false;
+	}
+
+	protected void cancelTimer(Timer timer) {
+		timer.cancel();
+		timer.purge();
+		timer = null;
 	}
 	
 	private void closeSelector() {
@@ -351,17 +359,15 @@ public abstract class Client extends Multiplex {
 	// Pier to pier communication.
 	// --------------------------------------------------------------------------------------------
 	
-	//private ProtocolData lastSent = null;
+	protected ProtocolData received;
 	
 	@Override
-	protected void respond(Channel channel) throws IOException {
-		
-		if (!testProtocol()) {
+	protected void respond(Channel channel) throws IOException {		
+		if (!isProtocolData()) {
 			saveData();
 			return;
 		}
-		
-		ProtocolData received = new ProtocolData(buffer);
+		received = new ProtocolData(buffer);
 		if (received.getType() == DataType.CHAT_OK) {
 			chatOKFromPier(received);
 		}
@@ -380,14 +386,35 @@ public abstract class Client extends Multiplex {
 		else if (received.getType() == DataType.TRANSFER_START) {
 			transferStart();
 		}
-		else if (received.getType() == DataType.TRANSFER_END) {
+	}
+	
+	// saveData() ---------------------------------------------------------------------------------
+	
+	protected int totalWritten = 0;
+	
+	protected void saveData() throws IOException {
+		FileOutputStream out = new FileOutputStream(receiveFile, true);
+		int limit = buffer.limit();
+		if (totalWritten + limit <= totalSize) {
+			out.write(buffer.array(), 0, limit);
+			out.flush();
+			totalWritten += limit;
+			out.close();
+			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
+		}
+		else {
+			out.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
+			out.flush();
+			totalWritten += totalSize - totalWritten;
+			out.close();
+			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
 			transferEnd();
 		}
 	}
 	
 	// CHAT_OK ------------------------------------------------------------------------------------
 
-	private void chatOKFromPier(ProtocolData chatOK) throws IOException {
+	protected void chatOKFromPier(ProtocolData chatOK) throws IOException {
 		System.out.println("Bate-papo aceito (digite q() para finalizar):\n");
 		String host = chatOK.getHeaderLine(2);
 		Integer pierPort = Integer.parseInt(chatOK.getHeaderLine(3));
@@ -397,7 +424,7 @@ public abstract class Client extends Multiplex {
 	
 	// CHAT_MSG -----------------------------------------------------------------------------------
 	
-	private void chatMsg(ProtocolData chatMsg) {
+	protected void chatMsg(ProtocolData chatMsg) {
 		String sender = chatMsg.getHeaderLine(0);
 		String msg = chatMsg.getHeaderLine(1);
 		System.out.println("[" + sender + "]: " + msg);
@@ -405,7 +432,7 @@ public abstract class Client extends Multiplex {
 	
 	// CHAT_FINISHED ------------------------------------------------------------------------------
 	
-	private void chatFinished(Channel channel) throws IOException {
+	protected void chatFinished(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
 		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
 		chatEnd.addToHeader(userName);
@@ -420,7 +447,7 @@ public abstract class Client extends Multiplex {
 	
 	// CHAT_END -----------------------------------------------------------------------------------
 	
-	private void chatEnd(Channel channel) throws IOException {
+	protected void chatEnd(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
 		p2pPipe.close();
 		System.out.println("Bate-papo-finalizado!");
@@ -437,10 +464,10 @@ public abstract class Client extends Multiplex {
 	
 	// TRANSFER_OK -----------------------------------------------------------------------------
 	
-	private File receiveFile;
-	private Long totalSize;
+	protected File receiveFile;
+	protected Long totalSize;
 	
-	private void transferOKFromPier(ProtocolData transferOK) throws IOException {
+	protected void transferOKFromPier(ProtocolData transferOK) throws IOException {
 		String sender = transferOK.getHeaderLine(3);
 		String senderHost = transferOK.getHeaderLine(4);
 		Integer senderPierPort = Integer.parseInt(transferOK.getHeaderLine(5));
@@ -460,7 +487,7 @@ public abstract class Client extends Multiplex {
 	
 	// TRANSFER_START -----------------------------------------------------------------------------
 	
-	private void transferStart() throws IOException {
+	protected void transferStart() throws IOException {
 		DataInputStream inFromFile = new DataInputStream(new FileInputStream(sendFile));
 		byte[] fileBuffer = new byte[10000];
 		Integer bytesRead = inFromFile.read(fileBuffer);
@@ -471,41 +498,12 @@ public abstract class Client extends Multiplex {
 			bytesRead = inFromFile.read(fileBuffer);
 		}
 		inFromFile.close();
-		// Enviar ao servidor msg que acabou.
-		// O servidor manda a msg para o receiver para sair do estado de transfering.
-		//ProtocolData transferEnd = new ProtocolData(DataType.TRANSFER_END);
-		//p2pPipe.send(transferEnd);
 		transferEnd();
 	}
 	
-	// TRANSFER_END ------------------------------------------------------------------------------
-	
-	private void transferEnd() throws IOException {
+	protected void transferEnd() throws IOException {
 		p2pPipe.close();
 		System.out.println("Finalizada transferência de arquivo!");
 		printMenu();
-	}
-	
-	// FILE_DATA ----------------------------------------------------------------------------------
-	
-	private int totalWritten = 0;
-	
-	private void saveData() throws IOException {
-		FileOutputStream out = new FileOutputStream(receiveFile, true);
-		int limit = buffer.limit();
-		if (totalWritten + limit <= totalSize) {
-			out.write(buffer.array(), 0, limit);
-			totalWritten += limit;
-			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
-		}
-		else {
-			out.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
-			out.flush();
-			totalWritten += totalSize - totalWritten;
-			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
-			transferEnd();
-		}
 	}
 }
