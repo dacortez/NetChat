@@ -10,6 +10,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class UDPClient extends Client {
+	private static final long RESEND_TIME = 2 * 1000;
 
 	public UDPClient(String host, int port, int pierPort) throws IOException {
 		super(host, port, pierPort);
@@ -40,17 +41,15 @@ public class UDPClient extends Client {
 	
 	// saveData() ---------------------------------------------------------------------------------
 	
-	protected int totalWritten = 0;
-	
 	protected void saveData() throws IOException {
 		FileOutputStream out = new FileOutputStream(receiveFile, true);
 		int limit = buffer.limit();
-		if (totalWritten + limit <= totalSize) {
+		if (totalWritten + limit < totalSize) {
 			out.write(buffer.array(), 0, limit);
 			out.flush();
 			totalWritten += limit;
 			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
+			System.out.println("Total recebido = " + receiveFile.length());
 			p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
 		}
 		else {
@@ -58,8 +57,8 @@ public class UDPClient extends Client {
 			out.flush();
 			totalWritten += totalSize - totalWritten;
 			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
 			p2pPipe.send(new ProtocolData(DataType.DATA_SAVED));
+			System.out.println("Total recebido = " + receiveFile.length());
 			transferEnd();
 		}
 	}		
@@ -90,20 +89,19 @@ public class UDPClient extends Client {
 						e.printStackTrace();
 					}
 			}
-		}, 2 * 1000, 2 * 1000);
+		}, RESEND_TIME, RESEND_TIME);
 	}
 	
 	private byte[] lastSent;
-	private int contSent = 0;
 	
 	private void sendNext() throws IOException {
 		received = null;
 		Integer bytesRead = inFromFile.read(fileBuffer);
 		if (bytesRead > 0) {
-			contSent++;
 			lastSent = fileBuffer.clone();
 			p2pPipe.send(fileBuffer);
-			//System.out.println("Pacote enviado = " + bytesRead + " | " + contSent);
+			totalSent += bytesRead;
+			System.out.println("Total enviado = " + totalSent);
 		}
 		else {
 			cancelTimer(dataTimer);
@@ -115,6 +113,6 @@ public class UDPClient extends Client {
 	private void sendAgain() throws IOException {
 		received = null;
 		p2pPipe.send(lastSent);
-		System.out.println("Pacote reenviado | " + contSent);
+		System.out.println("Dados reenviados.");
 	}
 }

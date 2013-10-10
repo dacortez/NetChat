@@ -134,7 +134,7 @@ public class Server extends Multiplex {
 		User requested = getLoggedUser(chatRequest.getHeaderLine(0));
 		User sender = getLoggedUser(chatRequest.getHeaderLine(1));
 		if (requested != null)
-			checkConnectionAndLock(channel, requested, sender);
+			checkConnectionAndLockForChat(channel, requested, sender);
 		else {
 			ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
 			chatDenied.addToHeader("usuario nao conectado");
@@ -142,7 +142,7 @@ public class Server extends Multiplex {
 		}
 	}
 
-	private void checkConnectionAndLock(Channel channel, User requested, User sender) throws IOException {
+	private void checkConnectionAndLockForChat(Channel channel, User requested, User sender) throws IOException {
 		ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
 		if (isConnectionRight(channel, requested.getType())) {
 			if (!requested.isLocked()) {
@@ -193,12 +193,29 @@ public class Server extends Multiplex {
 	private void transferRequest(Channel channel, ProtocolData transferRequest) throws IOException {
 		User receiver = getLoggedUser(transferRequest.getHeaderLine(0));
 		User sender = getLoggedUser(transferRequest.getHeaderLine(1));
-		if (receiver != null && !receiver.isLocked()) {
-			send(channel, transferOK(receiver, sender));
+		if (receiver != null) {
+			checkConnectionAndLockForTransfer(channel, receiver, sender);
 		} 
 		else {
 			ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
-			transferDenied.addToHeader("usuario nao disponivel");
+			transferDenied.addToHeader("usuario nao conectado");
+			send(channel, transferDenied);
+		}
+	}
+	
+	private void checkConnectionAndLockForTransfer(Channel channel, User requested, User sender) throws IOException {
+		ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
+		if (isConnectionRight(channel, requested.getType())) {
+			if (!requested.isLocked()) {
+				send(channel, transferOK(requested, sender));
+			}
+			else {
+				transferDenied.addToHeader("usuario bloqueado");
+				send(channel, transferDenied);
+			}
+		}
+		else {
+			transferDenied.addToHeader("outro tipo de conexao");
 			send(channel, transferDenied);
 		}
 	}

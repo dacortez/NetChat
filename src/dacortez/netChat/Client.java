@@ -79,7 +79,7 @@ public abstract class Client extends Multiplex {
 		}
 		else if (received.getType() == DataType.LOGIN_FAIL) {
 			System.out.println("Login inválido! Até a próxima...");
-			timer.cancel();
+			cancelTimer(timer);
 		}
 	}
 
@@ -342,9 +342,11 @@ public abstract class Client extends Multiplex {
 	}
 
 	protected void cancelTimer(Timer timer) {
-		timer.cancel();
-		timer.purge();
-		timer = null;
+		if (timer != null) {
+			timer.cancel();
+			timer.purge();
+			timer = null;
+		}
 	}
 	
 	private void closeSelector() {
@@ -395,19 +397,19 @@ public abstract class Client extends Multiplex {
 	protected void saveData() throws IOException {
 		FileOutputStream out = new FileOutputStream(receiveFile, true);
 		int limit = buffer.limit();
-		if (totalWritten + limit <= totalSize) {
+		if (totalWritten + limit < totalSize) {
 			out.write(buffer.array(), 0, limit);
 			out.flush();
 			totalWritten += limit;
 			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
+			System.out.println("Total recebido = " + receiveFile.length());
 		}
 		else {
 			out.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
 			out.flush();
 			totalWritten += totalSize - totalWritten;
 			out.close();
-			System.out.println("Total escrito = " + totalWritten + " / " + receiveFile.length());
+			System.out.println("Total recebido = " + receiveFile.length());
 			transferEnd();
 		}
 	}
@@ -487,14 +489,16 @@ public abstract class Client extends Multiplex {
 	
 	// TRANSFER_START -----------------------------------------------------------------------------
 	
+	protected int totalSent = 0;
+	
 	protected void transferStart() throws IOException {
 		DataInputStream inFromFile = new DataInputStream(new FileInputStream(sendFile));
 		byte[] fileBuffer = new byte[10000];
 		Integer bytesRead = inFromFile.read(fileBuffer);
-		int i = 0;
 		while (bytesRead > 0) {
 			p2pPipe.send(fileBuffer);
-			System.out.println("Pacote enviado = " + bytesRead + " | " + (++i));
+			totalSent += bytesRead;
+			System.out.println("Total enviado = " + totalSent);
 			bytesRead = inFromFile.read(fileBuffer);
 		}
 		inFromFile.close();
