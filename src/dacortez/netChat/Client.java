@@ -3,6 +3,7 @@ package dacortez.netChat;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,6 +11,8 @@ import java.io.File;
 import java.nio.channels.Channel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -101,6 +104,7 @@ public abstract class Client extends Multiplex {
 		System.out.println("(L) Lista usuários logados");
 		System.out.println("(B) Iniciar bate-papo com usuário");
 		System.out.println("(A) Enviar arquivo para usuário");
+		System.out.println("(E) Fazer experimento do EP");
 		System.out.println("(Q) Fazer logout");
 		System.out.println("Escolha uma das opções:");
 		state = ClientState.SCANNING_MENU;
@@ -268,6 +272,10 @@ public abstract class Client extends Multiplex {
 		Long fileSize = sendFile.length();
 		transferOK.addToHeader(sendFile.getName());
 		transferOK.addToHeader(fileSize.toString());
+		if (doExperiment)
+			transferOK.addToHeader("T");
+		else
+			transferOK.addToHeader("F");
 		state = ClientState.TRANSFERING;
 		System.out.println("Iniciando transferência de arquivo...");
 		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());		
@@ -280,21 +288,41 @@ public abstract class Client extends Multiplex {
 	protected int totalSent;
 	protected final byte[] fileBuffer = new byte[10000];
 	protected DataInputStream inFromFile;
+	protected static final int MAX = 30;
 	
 	private void transferStart() throws IOException {
+		if (doExperiment) {
+			List<Double> times = new ArrayList<Double>();
+			for (int i = 1; i <= MAX; i++) {
+				times.add(sendOneFile());
+				System.out.println("Mediada de tempo " + i + " realizada!");
+			}
+			transferEndSender();
+			System.out.println("Média = " + mean(times) + " s");
+			System.out.println("Desvio-padrão = " + stdev(times) + " s");
+		}
+		else {
+			sendOneFile();
+			transferEndSender();
+		}
+	}
+
+	private Double sendOneFile() throws FileNotFoundException, IOException {
 		inFromFile = new DataInputStream(new FileInputStream(sendFile));
 		totalSent = 0;
+		Long startTime = System.currentTimeMillis();
 		Integer bytesRead = inFromFile.read(fileBuffer);
 		while (bytesRead > 0)
 			bytesRead = sendNextBlock(bytesRead);
+		Long endTime = System.currentTimeMillis();
 		inFromFile.close();
-		transferEndSender();
+		return (endTime - startTime) / 1000.0;
 	}
 
 	protected Integer sendNextBlock(Integer bytesRead) throws IOException {
 		p2pPipe.send(fileBuffer);
 		totalSent += bytesRead;
-		System.out.println("Total enviado = " + totalSent);
+		//System.out.println("Total enviado = " + totalSent);
 		return inFromFile.read(fileBuffer);
 	}
 	
@@ -302,6 +330,21 @@ public abstract class Client extends Multiplex {
 		p2pPipe.close();
 		System.out.println("Finalizada transferência de arquivo!");
 		printMenu();
+	}
+	
+	private Double mean(List<Double> values) {
+		Double sum = 0.0;
+		for (Double value: values)
+			sum += value;
+		return sum / values.size();
+	}
+	
+	private Double stdev(List<Double> values) {
+		Double mean = mean(values);
+		Double sum = 0.0;
+		for (Double value: values)
+			sum += (value - mean) * (value - mean) ;
+		return Math.sqrt(sum / values.size());
 	}
 	
 	// TRANSFERING --------------------------------------------------------------------------------
@@ -312,6 +355,8 @@ public abstract class Client extends Multiplex {
 	
 	// SCANNING_MENU --------------------------------------------------------------------------------
 
+	protected boolean doExperiment;
+	
 	private void scanningMenu(char option) {
 		switch (option) {
 		case 'L': case 'l':
@@ -323,6 +368,12 @@ public abstract class Client extends Multiplex {
 			state = ClientState.TYPING_USER;
 			break;
 		case 'A': case 'a':
+			doExperiment = false;
+			System.out.println("Informe arquivo e usuário (path>>username):");
+			state = ClientState.TYPING_FILE;
+			break;
+		case 'E': case 'e':
+			doExperiment = true;
 			System.out.println("Informe arquivo e usuário (path>>username):");
 			state = ClientState.TYPING_FILE;
 			break;
@@ -432,7 +483,7 @@ public abstract class Client extends Multiplex {
 	protected void writeNextBlock(int limit) throws IOException {
 		fileOut.write(buffer.array(), 0, limit);
 		totalWritten += limit;
-		System.out.println("Total recebido = " + receiveFile.length());
+		//System.out.println("Total recebido = " + receiveFile.length());
 	}
 	
 	protected void writeFinalBlock() throws IOException {
@@ -440,12 +491,25 @@ public abstract class Client extends Multiplex {
 		totalWritten += totalSize - totalWritten;
 		fileOut.flush();
 		fileOut.close();
-		System.out.println("Total recebido = " + receiveFile.length());
+		//System.out.println("Total recebido = " + receiveFile.length());
 	}
 
-	protected void transferEndReceiver() {
+	protected void transferEndReceiver() throws FileNotFoundException {
 		System.out.println("Arquivo recebido com sucesso!");
-		printMenu();
+		if (doExperiment) 
+			if (++filesReceived >= MAX) {
+				doExperiment = false;
+				printMenu();
+			}
+			else {
+				System.out.println("Recebendo " + (filesReceived + 1) + "...");
+				receiveFile.delete();
+				fileOut = new FileOutputStream(receiveFile, true);
+				totalWritten = 0;
+			}
+		else {
+			printMenu();
+		}
 	}
 	
 	// CHAT_OK ------------------------------------------------------------------------------------
@@ -501,9 +565,10 @@ public abstract class Client extends Multiplex {
 	// TRANSFER_OK -----------------------------------------------------------------------------
 	
 	protected Long totalSize;
-	protected File receiveFile;
-	protected FileOutputStream fileOut;
+	private File receiveFile;
+	private FileOutputStream fileOut;
 	protected int totalWritten;
+	protected int filesReceived;
 	
 	private void transferOKFromPier(Channel channel, ProtocolData transferOK) throws IOException {
 		String sender = transferOK.getHeaderLine(3);
@@ -511,6 +576,7 @@ public abstract class Client extends Multiplex {
 		Integer senderPierPort = Integer.parseInt(transferOK.getHeaderLine(5));
 		String fileName = transferOK.getHeaderLine(6);
 		totalSize = Long.parseLong(transferOK.getHeaderLine(7));
+		doExperiment = transferOK.getHeaderLine(8).contentEquals("T");
 		receiveFile = new File("r_" + fileName);
 		if (receiveFile.exists()) {
 			receiveFile.delete();
@@ -518,6 +584,7 @@ public abstract class Client extends Multiplex {
 		}
 		fileOut = new FileOutputStream(receiveFile, true);
 		totalWritten = 0;
+		filesReceived = 0;
 		state = ClientState.TRANSFERING;
 		System.out.println("Recebendo arquivo de " + sender + "@" + senderHost + ":" + senderPierPort);
 		ProtocolData transferStart = new ProtocolData(DataType.TRANSFER_START);

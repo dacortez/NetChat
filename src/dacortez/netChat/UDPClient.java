@@ -47,7 +47,7 @@ public class UDPClient extends Client {
 	protected Integer sendNextBlock(Integer bytesRead) throws IOException {
 		p2pPipe.send(fileBuffer);
 		totalSent += bytesRead;
-		System.out.println("Total enviado = " + totalSent);
+		//System.out.println("Total enviado = " + totalSent);
 		p2pPipe.receive();
 		return inFromFile.read(fileBuffer);
 	}
