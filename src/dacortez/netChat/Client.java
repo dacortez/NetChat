@@ -273,31 +273,32 @@ public abstract class Client extends Multiplex {
 		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());		
 		p2pInstantiation(receiverHost, receiverPierPort);
 		p2pPipe.send(transferOK);
-		
-		ProtocolData received = p2pPipe.receive();
-		if (received.getType() == DataType.TRANSFER_START) {
+		if (p2pPipe.receive().getType() == DataType.TRANSFER_START)
 			transferStart();
-		}
 	}
 	
 	protected int totalSent;
+	protected final byte[] fileBuffer = new byte[10000];
+	protected DataInputStream inFromFile;
 	
-	protected void transferStart() throws IOException {
+	private void transferStart() throws IOException {
+		inFromFile = new DataInputStream(new FileInputStream(sendFile));
 		totalSent = 0;
-		DataInputStream inFromFile = new DataInputStream(new FileInputStream(sendFile));
-		byte[] fileBuffer = new byte[10000];
 		Integer bytesRead = inFromFile.read(fileBuffer);
-		while (bytesRead > 0) {
-			p2pPipe.send(fileBuffer);
-			totalSent += bytesRead;
-			System.out.println("Total enviado = " + totalSent);
-			bytesRead = inFromFile.read(fileBuffer);
-		}
+		while (bytesRead > 0)
+			bytesRead = sendNextBlock(bytesRead);
 		inFromFile.close();
 		transferEndSender();
 	}
+
+	protected Integer sendNextBlock(Integer bytesRead) throws IOException {
+		p2pPipe.send(fileBuffer);
+		totalSent += bytesRead;
+		System.out.println("Total enviado = " + totalSent);
+		return inFromFile.read(fileBuffer);
+	}
 	
-	protected void transferEndSender() throws IOException {
+	private void transferEndSender() throws IOException {
 		p2pPipe.close();
 		System.out.println("Finalizada transferência de arquivo!");
 		printMenu();
@@ -418,23 +419,28 @@ public abstract class Client extends Multiplex {
 	// saveData() ---------------------------------------------------------------------------------
 	
 	protected void saveData(Channel channel) throws IOException {
-		FileOutputStream out = new FileOutputStream(receiveFile, true);
 		int limit = buffer.limit();
 		if (totalWritten + limit < totalSize) {
-			out.write(buffer.array(), 0, limit);
-			totalWritten += limit;
-			out.flush();
-			out.close();
-			System.out.println("Total recebido = " + receiveFile.length());
+			writeNextBlock(limit);
 		}
 		else {
-			out.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
-			totalWritten += totalSize - totalWritten;
-			out.flush();
-			out.close();
-			System.out.println("Total recebido = " + receiveFile.length());
+			writeFinalBlock();
 			transferEndReceiver();
 		}
+	}
+
+	protected void writeNextBlock(int limit) throws IOException {
+		fileOut.write(buffer.array(), 0, limit);
+		totalWritten += limit;
+		System.out.println("Total recebido = " + receiveFile.length());
+	}
+	
+	protected void writeFinalBlock() throws IOException {
+		fileOut.write(buffer.array(), 0, totalSize.intValue() - totalWritten);
+		totalWritten += totalSize - totalWritten;
+		fileOut.flush();
+		fileOut.close();
+		System.out.println("Total recebido = " + receiveFile.length());
 	}
 
 	protected void transferEndReceiver() {
@@ -494,8 +500,9 @@ public abstract class Client extends Multiplex {
 	
 	// TRANSFER_OK -----------------------------------------------------------------------------
 	
-	protected File receiveFile;
 	protected Long totalSize;
+	protected File receiveFile;
+	protected FileOutputStream fileOut;
 	protected int totalWritten;
 	
 	private void transferOKFromPier(Channel channel, ProtocolData transferOK) throws IOException {
@@ -508,7 +515,8 @@ public abstract class Client extends Multiplex {
 		if (receiveFile.exists()) {
 			receiveFile.delete();
 			receiveFile.createNewFile();
-		} 
+		}
+		fileOut = new FileOutputStream(receiveFile, true);
 		totalWritten = 0;
 		state = ClientState.TRANSFERING;
 		System.out.println("Recebendo arquivo de " + sender + "@" + senderHost + ":" + senderPierPort);
