@@ -139,8 +139,11 @@ public abstract class Multiplex {
 				DatagramChannel newChannel = DatagramChannel.open(); 
 				newChannel.connect(address);
 				respond(newChannel);
+				newChannel.disconnect();
+				newChannel.close();
 			}
 		} catch (IOException ie) {
+			ie.printStackTrace();
 			key.cancel();
 		}
 	}
