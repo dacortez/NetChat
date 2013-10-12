@@ -1,6 +1,9 @@
 /**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
  * 
  */
+
 package dacortez.netChat.examples;
 
 import java.io.IOException;
@@ -9,8 +12,10 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 
 /**
- * @author dacortez
- *
+ * Servidor UDP básico para fins de testes. Não faz parte do EP.
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
  */
 public class UDPServer {
 

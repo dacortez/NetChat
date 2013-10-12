@@ -21,13 +21,15 @@ import java.util.Random;
 public class UDPPipe implements Pipe {
 	// Buffer para transferência da dados.
 	private final byte[] buffer = new byte[10000];
-	// Socket TCP resposável pela comunicação.
+	// Socket UDP resposável pela comunicação.
 	private DatagramSocket socket;
+	// Endereço para conexão UDP.
 	private InetAddress inet;
+	// Porta para conexão UDP.
 	private int port;
 	
 	public UDPPipe(String host, int port) throws IOException {
-		socket = new DatagramSocket(6001 + new Random().nextInt(500));
+		socket = new DatagramSocket(9001 + new Random().nextInt(2000));
 		inet = InetAddress.getByName(host);
 		this.port = port;
 	}
@@ -51,8 +53,7 @@ public class UDPPipe implements Pipe {
 		socket.receive(packet);		
 		byte[] data = packet.getData();
 		int length = data.length;
-		ProtocolData received = new ProtocolData(data, length); 
-		return received;
+		return new ProtocolData(data, length); 
 	}
 	
 	@Override 

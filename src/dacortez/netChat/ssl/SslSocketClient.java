@@ -1,12 +1,18 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat.ssl;
+
+import java.io.*;
+import javax.net.ssl.*;
 
 /**
  * SslSocketClient.java
  * Copyright (c) 2005 by Dr. Herong Yang
  */
-import java.io.*;
-import javax.net.ssl.*;
-
 public class SslSocketClient {
 	public static void main(String[] args) {
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));

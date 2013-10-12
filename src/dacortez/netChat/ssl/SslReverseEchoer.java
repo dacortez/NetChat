@@ -1,13 +1,19 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat.ssl;
+
+import java.io.*;
+import java.security.*;
+import javax.net.ssl.*;
 
 /**
  * SslReverseEchoer.java
  * Copyright (c) 2005 by Dr. Herong Yang
  */
-import java.io.*;
-import java.security.*;
-import javax.net.ssl.*;
-
 public class SslReverseEchoer {
 	public static void main(String[] args) {
 		String ksName = "dacortez.jks";

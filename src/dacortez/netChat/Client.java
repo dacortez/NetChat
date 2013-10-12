@@ -58,11 +58,11 @@ public abstract class Client extends Multiplex {
 		int serverPort = Integer.parseInt(args[1]);
 		if (args[2].charAt(0) == 'T') {
 			System.out.println("Cliente TCP");
-			new TCPClient(host, serverPort, 5000 + new Random().nextInt(3000)).start();
+			new TCPClient(host, serverPort, 7001 + new Random().nextInt(2000)).start();
 		}
 		else if (args[2].charAt(0) == 'U') {
 			System.out.println("Cliente UDP");
-			new UDPClient(host, serverPort, 5000 + new Random().nextInt(3000)).start();
+			new UDPClient(host, serverPort, 7001 + new Random().nextInt(2000)).start();
 		}
 	}
 	
