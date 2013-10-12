@@ -4,6 +4,13 @@ import java.io.IOException;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
+/**
+ * Concretiza a classe Client utilizando o protocolo UDP para
+ * comunicação com o servidor e com outros clientes (p2p).
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
+ */
 public class UDPClient extends Client {
 
 	public UDPClient(String host, int port, int pierPort) throws Exception {
@@ -25,7 +32,7 @@ public class UDPClient extends Client {
 		p2pPipe = new UDPPipe(host, port);
 	}
 	
-	// saveData() ---------------------------------------------------------------------------------
+	// Bloco de dados (bytes) do arquivo sendo transferido --------------------
 	
 	@Override
 	protected void saveData(Channel channel) throws IOException {

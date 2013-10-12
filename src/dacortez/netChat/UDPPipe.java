@@ -1,3 +1,9 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.io.IOException;
@@ -6,8 +12,16 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Random;
 
+/**
+ * Implementa Pipe utilizando um socket UDP.
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
+ */
 public class UDPPipe implements Pipe {
+	// Buffer para transferência da dados.
 	private final byte[] buffer = new byte[10000];
+	// Socket TCP resposável pela comunicação.
 	private DatagramSocket socket;
 	private InetAddress inet;
 	private int port;

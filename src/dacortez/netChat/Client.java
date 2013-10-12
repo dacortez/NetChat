@@ -1,3 +1,9 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.io.BufferedReader;
@@ -17,27 +23,46 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
+/**
+ * O cliente estende a classe Multiplex para poder receber conexões 
+ * TCP e UDP dos outros clientes (p2p), bem como tratar a entrada 
+ * padrão. A conexão com o servidor também pode ser feita usando 
+ * tanto TCP quanto UDP, dependendo das classes concretas TCPClient 
+ * e UDPClient. Envia periodicamente heart beats para o servidor.
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
+ */
 public abstract class Client extends Multiplex {
+	// O endereço do servidor para conexão.
 	protected String host;
+	// A porta do servidor para conexão.
 	protected Integer serverPort;
+	// A porta do cliente para poder receber conexão de outros clientes.
 	protected Integer pierPort;
+	// Entrada padrão do usuário.
 	protected final BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+	// Username do usuário rodando o proceeso cliente.
 	protected String userName;
+	// Variável de estada para o processo cliente.
 	protected ClientState state;
+	// Permite transferência de dados com o servidor.
 	protected Pipe serverPipe;
+	// Permite transferência de dados com outros clientes.
 	protected Pipe p2pPipe;
+	// Tempo em segundos entre envio de heart beats ao servidor.
 	public static final long HEART_BEAT = 5;
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
 		int serverPort = Integer.parseInt(args[1]);
 		if (args[2].charAt(0) == 'T') {
-			System.out.println("TCP");
-			new TCPClient(host, serverPort, 5000 + new Random().nextInt(1000)).start();
+			System.out.println("Cliente TCP");
+			new TCPClient(host, serverPort, 5000 + new Random().nextInt(3000)).start();
 		}
 		else if (args[2].charAt(0) == 'U') {
-			System.out.println("UDP");
-			new UDPClient(host, serverPort, 5000 + new Random().nextInt(1000)).start();
+			System.out.println("Cliente UDP");
+			new UDPClient(host, serverPort, 5000 + new Random().nextInt(3000)).start();
 		}
 	}
 	
@@ -82,7 +107,7 @@ public abstract class Client extends Multiplex {
 		serverPipe.send(loginRequest());
 		ProtocolData received = serverPipe.receive();
 		if (received.getMessage() == ProtocolMessage.LOGIN_OK) {
-			System.out.println("Bem-vindo ao servidor de Chat!");
+			System.out.println("Bem-vindo ao sistema de bate-papo!");
 			printMenu();
 			run();
 		}
@@ -93,7 +118,7 @@ public abstract class Client extends Multiplex {
 	}
 
 	private ProtocolData loginRequest() throws IOException {
-		System.out.println("Servidor disponível!");
+		System.out.println("O servidor está disponível!");
 		System.out.println("Faça seu login...");
 		System.out.print("Username: ");
 		userName = inFromUser.readLine().toLowerCase();
@@ -232,6 +257,7 @@ public abstract class Client extends Multiplex {
 		return null;
 	}
 	
+	// Arquivo que será enviado ao outro cliente.
 	protected File sendFile;
 
 	private ProtocolData transferRequest(String pathAndUserName, int index) {
@@ -291,15 +317,19 @@ public abstract class Client extends Multiplex {
 			transferStart();
 	}
 	
+	// Total de bytes do arquivo enviados.
 	protected int totalSent;
+	// Buffer para leitura do arquivo.
 	protected final byte[] fileBuffer = new byte[10000];
+	// InputStream do arquivo sendo transferido.
 	protected DataInputStream inFromFile;
-	protected static final int MAX = 30;
+	// Número de medidadas de tempo para o experimento do EP.
+	protected static final int MAX_EXP = 30;
 	
 	private void transferStart() throws IOException {
 		if (doExperiment) {
 			List<Double> times = new ArrayList<Double>();
-			for (int i = 1; i <= MAX; i++) {
+			for (int i = 1; i <= MAX_EXP; i++) {
 				times.add(sendOneFile());
 				System.out.println("Mediada de tempo " + i + " realizada!");
 			}
@@ -328,7 +358,6 @@ public abstract class Client extends Multiplex {
 	protected Integer sendNextBlock(Integer bytesRead) throws IOException {
 		p2pPipe.send(fileBuffer);
 		totalSent += bytesRead;
-		//System.out.println("Total enviado = " + totalSent);
 		return inFromFile.read(fileBuffer);
 	}
 	
@@ -465,7 +494,7 @@ public abstract class Client extends Multiplex {
 		}
 	}
 	
-	// saveData() ---------------------------------------------------------------------------------
+	// Bloco de dados (bytes) do arquivo sendo transferido --------------------
 	
 	protected void saveData(Channel channel) throws IOException {
 		int limit = buffer.limit();
@@ -481,7 +510,6 @@ public abstract class Client extends Multiplex {
 	protected void writeNextBlock(int limit) throws IOException {
 		fileOut.write(buffer.array(), 0, limit);
 		totalWritten += limit;
-		//System.out.println("Total recebido = " + receiveFile.length());
 	}
 	
 	protected void writeFinalBlock() throws IOException {
@@ -489,13 +517,12 @@ public abstract class Client extends Multiplex {
 		totalWritten += totalSize - totalWritten;
 		fileOut.flush();
 		fileOut.close();
-		//System.out.println("Total recebido = " + receiveFile.length());
 	}
 
 	protected void transferEndReceiver() throws FileNotFoundException {
 		System.out.println("Arquivo recebido com sucesso!");
 		if (doExperiment) 
-			if (++filesReceived >= MAX) {
+			if (++filesReceived >= MAX_EXP) {
 				doExperiment = false;
 				printMenu();
 			}

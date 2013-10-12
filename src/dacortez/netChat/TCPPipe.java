@@ -1,11 +1,25 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
+/**
+ * Implementa Pipe utilizando um socket TCP.
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
+ */
 public class TCPPipe implements Pipe {
+	// Buffer para transferência de dados.
 	private final byte[] buffer = new byte[10000];
+	// Socket TCP resposável pela comunicação.
 	private Socket socket;
 	
 	public TCPPipe(String host, int port) throws IOException {
@@ -17,8 +31,6 @@ public class TCPPipe implements Pipe {
 		byte[] array = protocolData.toByteArray();
 		DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 		out.write(array);
-		//System.out.println("Sent array.length = " + array.length + " / data.size = " + data.getSize());
-		//System.out.println("Sent " + array.length + " from " + socket);
 	}
 	
 	@Override
@@ -31,7 +43,6 @@ public class TCPPipe implements Pipe {
 	public ProtocolData receive() throws IOException {
 		int length = socket.getInputStream().read(buffer);
 		ProtocolData protocolData = new ProtocolData(buffer, length); 
-		//System.out.println("Read " + length + " from " + socket);
 		return protocolData;
 	}
 	
@@ -40,5 +51,3 @@ public class TCPPipe implements Pipe {
 		socket.close();
 	}
 }
-	
-

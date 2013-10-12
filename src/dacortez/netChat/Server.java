@@ -50,17 +50,21 @@ public class Server extends Multiplex {
 		this.port = port;
 		setAllUsers();
 		df = new SimpleDateFormat("HH:mm:ss dd/MM/yyyy");
-		try {
-			ps = new PrintStream(new File("server.log"));
-		} catch (FileNotFoundException e) {
-			ps = System.out;
-		}
+		setPrintStream();
 	}
 
 	private void setAllUsers() {
 		allUsers.add(new User("Joao Fulano", "joao", "3858f62230ac3c915f300c664312c63f"));
 		allUsers.add(new User("Maria Ciclano", "maria", "3858f62230ac3c915f300c664312c63f"));
 		allUsers.add(new User("Pedro Beltrano", "pedro", "3858f62230ac3c915f300c664312c63f"));
+	}
+	
+	private void setPrintStream() {
+		try {
+			ps = new PrintStream(new File("server.log"));
+		} catch (FileNotFoundException e) {
+			ps = System.out;
+		}
 	}
 
 	public static void main(String[] args) throws Exception {
