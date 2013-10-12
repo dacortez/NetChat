@@ -12,7 +12,7 @@ package dacortez.netChat;
  * porta para conexão p2p e status de travamento (usuário
  * batendo papo com outro usuario).
  * 
- * @author dacortez
+ * @author dacortez (dacortez79@gmail.com)
  * @version 2013.10.12
  */
 public class User {

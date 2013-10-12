@@ -11,7 +11,7 @@ package dacortez.netChat;
  * comunicação entre servido e cliente, ou entre cliente e 
  * cliente (p2p).
  * 
- * @author dacortez
+ * @author dacortez (dacortez79@gmail.com)
  * @version 2013.10.12
  */
 public enum ProtocolMessage {
@@ -34,7 +34,6 @@ public enum ProtocolMessage {
 	TRANSFER_OK("EP2P/TRANSFER_OK"),
 	TRANSFER_DENIED("EP2P/TRANSFER_DENIED"),
 	TRANSFER_START("EP2P/TRANSFER/START"),
-	FILE_DATA("EP2P/FILE_DATA"),
 	DATA_SAVED("EP2P/DATA_SAVED"),
 	SEND_AGAIN("EP2P/SEND_AGAIN"),
 	HEART_BEAT("EP2P/HEART_BEAT");

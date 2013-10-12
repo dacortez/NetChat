@@ -1,22 +1,34 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Encapsula os dados trocados entre servidor e cliente, ou entre
+ * cliente e cliente (p2p) utilizando o protocolo de comunicação
+ * estabelecido. Contém o tipo de mensagem trocada e os dados do 
+ * cabeçalho associado.
+ * 
+ * @author dacortez (dacortez79@gmail.com)
+ * @version 2013.10.12
+ */
 public class ProtocolData {
+	// Tipo de mensagem utilizada no protocol.
 	private ProtocolMessage message;
+	// Dados do cabeçalho.
 	private List<String> header;
-	private byte[] data;
 	
 	public ProtocolMessage getMessage() {
 		return message;
 	}
-	
-	public byte[] getData() {
-		return data;
-	}
-		
+			
 	public ProtocolData(ProtocolMessage type) {
 		header = new ArrayList<String>();
 		this.message = type;
@@ -25,8 +37,7 @@ public class ProtocolData {
 	public ProtocolData(ByteBuffer buffer) {
 		header = new ArrayList<String>();
 		int i = setType(buffer);
-		i = setHeader(buffer, i);
-		setData(buffer, i);
+		setHeader(buffer, i);
 	}
 
 	private int setType(ByteBuffer buffer) {
@@ -51,20 +62,10 @@ public class ProtocolData {
 		}
 	}
 	
-	private void setData(ByteBuffer buffer, int i) {
-		int j = 0;
-		if (buffer.limit() > i) {
-			data = new byte[buffer.limit() - i];
-			while (i < buffer.limit())
-				data[j++] = buffer.get(i++);
-		}
-	}
-	
 	public ProtocolData(byte[] array, int length) {
 		header = new ArrayList<String>();
 		int i = setTitle(array);
-		i = setHeader(array, i);
-		setData(array, i, length);
+		setHeader(array, i);
 	}
 	
 	private int setTitle(byte[] array) {
@@ -89,24 +90,12 @@ public class ProtocolData {
 		}
 	}
 	
-	private void setData(byte[] array, int i, int length) {
-		int j = 0;
-		if (length > i) {
-			data = new byte[length - i];
-			while (i < length)
-				data[j++] = array[i++];
-		}
-	}
-	
 	public byte[] toByteArray() {
 		byte[] array = new byte[getSize()];
 		int i = appendLine(message.toString(), 0, array);
 		for (String line: header)
 			i = appendLine(line, i, array);
 		array[i++] = '\r'; array[i++] = '\n';
-		if (data != null)
-			for (int j = 0; j < data.length; j++)
-				array[i++] = data[j];
 		return array;
 	}
 
@@ -123,9 +112,6 @@ public class ProtocolData {
 		for (String line: header)
 			i = appendLine(line, i, buffer);
 		buffer.put(i++, (byte) '\r'); buffer.put(i++, (byte) '\n');
-		if (data != null)
-			for (int j = 0; j < data.length; j++)
-				buffer.put(i++, data[j]);
 		return buffer;
 	}
 	
@@ -142,8 +128,6 @@ public class ProtocolData {
 		for (String line: header)
 			size += line.length() + 2;
 		size += 2;
-		if (data != null)
-			size += data.length;
 		return size;
 	}
 	
@@ -158,23 +142,7 @@ public class ProtocolData {
 	public String getHeaderLine(int index) {
 		return header.get(index);
 	}
-	
-	public void copyData(byte[] buffer, int len) {
-		data = new byte[len];
-		for (int i = 0; i < len; i++)
-			data[i] = buffer[i];
-	}
-
-	public void appendData(byte[] buffer) {
-		byte[] newData = new byte[data.length + buffer.length];
-		int j = 0;
-		for (int i = 0; i < data.length; i++)
-			newData[j++] = data[i];
-		for (int i = 0; i < buffer.length; i++)
-			newData[j++] = buffer[i];
-		data = newData;
-	}
-	
+		
 	private ProtocolMessage selectMessage(String value) {
 		if (value.contentEquals(ProtocolMessage.CONNECTION_OK.toString()))
 			return ProtocolMessage.CONNECTION_OK;
@@ -212,8 +180,6 @@ public class ProtocolData {
 			return ProtocolMessage.TRANSFER_DENIED;
 		if (value.contentEquals(ProtocolMessage.TRANSFER_START.toString()))
 			return ProtocolMessage.TRANSFER_START;
-		if (value.contentEquals(ProtocolMessage.FILE_DATA.toString()))
-			return ProtocolMessage.FILE_DATA;
 		if (value.contentEquals(ProtocolMessage.DATA_SAVED.toString()))
 			return ProtocolMessage.DATA_SAVED;
 		if (value.contentEquals(ProtocolMessage.SEND_AGAIN.toString()))
@@ -230,16 +196,6 @@ public class ProtocolData {
 		for (String line: header)
 			sb.append(line).append("\r\n");
 		sb.append("\r\n");
-		if (message == ProtocolMessage.FILE_DATA)
-			sb.append(dataToString());
-		return sb.toString();
-	}
-	
-	private String dataToString() {
-		StringBuilder sb = new StringBuilder();
-		int length = Integer.parseInt(header.get(0));
-		for (int i = 0; i < length; i++)
-			sb.append((char) data[i]);
 		return sb.toString();
 	}
 }

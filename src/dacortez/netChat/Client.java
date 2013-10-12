@@ -26,7 +26,7 @@ public abstract class Client extends Multiplex {
 	protected ClientState state;
 	protected Pipe serverPipe;
 	protected Pipe p2pPipe;
-	private static final long HEART_BEAT_TIME = 10 * 1000;
+	public static final long HEART_BEAT = 5;
 	
 	public static void main(String args[]) throws Exception {
 		String host = args[0];
@@ -56,6 +56,11 @@ public abstract class Client extends Multiplex {
 		serverPipe.close();		
 	}
 	
+	/* O timer do cliente envia informação de hear beat a cada
+	 * HEART_BEAT segundos.
+	 * (non-Javadoc)
+	 * @see dacortez.netChat.Multiplex#setTimer()
+	 */
 	@Override
 	protected void setTimer() {
 		timer = new Timer();
@@ -64,12 +69,13 @@ public abstract class Client extends Multiplex {
 			public void run() {
 				try {
 					ProtocolData heartBeat = new ProtocolData(ProtocolMessage.HEART_BEAT);
+					heartBeat.addToHeader(userName);
 					serverPipe.send(heartBeat);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
-		}, HEART_BEAT_TIME,  HEART_BEAT_TIME);
+		}, HEART_BEAT * 1000,  HEART_BEAT * 1000);
 	}
 	
 	protected void doLogin() throws IOException {
@@ -122,7 +128,7 @@ public abstract class Client extends Multiplex {
 		case TYPING_FILE:
 			typingFile();
 			break;
-		case TRANSFERING:
+		case TRANSFERING_FILE:
 			transfering();
 			break;
 		case SCANNING_MENU:	
@@ -276,7 +282,7 @@ public abstract class Client extends Multiplex {
 			transferOK.addToHeader("T");
 		else
 			transferOK.addToHeader("F");
-		state = ClientState.TRANSFERING;
+		state = ClientState.TRANSFERING_FILE;
 		System.out.println("Iniciando transferência de arquivo...");
 		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());		
 		p2pInstantiation(receiverHost, receiverPierPort);
@@ -419,14 +425,6 @@ public abstract class Client extends Multiplex {
 			e.printStackTrace();
 		}
 		return false;
-	}
-
-	protected void cancelTimer(Timer timer) {
-		if (timer != null) {
-			timer.cancel();
-			timer.purge();
-			timer = null;
-		}
 	}
 	
 	private void closeSelector() {
@@ -585,7 +583,7 @@ public abstract class Client extends Multiplex {
 		fileOut = new FileOutputStream(receiveFile, true);
 		totalWritten = 0;
 		filesReceived = 0;
-		state = ClientState.TRANSFERING;
+		state = ClientState.TRANSFERING_FILE;
 		System.out.println("Recebendo arquivo de " + sender + "@" + senderHost + ":" + senderPierPort);
 		ProtocolData transferStart = new ProtocolData(ProtocolMessage.TRANSFER_START);
 		send(channel, transferStart);	

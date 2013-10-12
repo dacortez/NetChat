@@ -5,7 +5,7 @@ import java.nio.channels.SelectionKey;
 
 public class TCPClient extends Client {
 	
-	public TCPClient(String host, int port, int pierPort) throws IOException {
+	public TCPClient(String host, int port, int pierPort) throws Exception {
 		super(host, port, pierPort);
 		serverPipe = new TCPPipe(host, port);
 	}

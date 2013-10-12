@@ -6,7 +6,7 @@ import java.nio.channels.SelectionKey;
 
 public class UDPClient extends Client {
 
-	public UDPClient(String host, int port, int pierPort) throws IOException {
+	public UDPClient(String host, int port, int pierPort) throws Exception {
 		super(host, port, pierPort);
 		serverPipe = new UDPPipe(host, port);
 	}

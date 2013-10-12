@@ -28,7 +28,7 @@ import java.util.Timer;
  * A classe Multiplex permite a multiplexação dos canais de rede
  * TCP/UDP e da entrada padrão através de um seletor. 
  * 
- * @author Daniel Augusto Cortez
+ * @author dacortez (dacortez79@gmail.com)
  * @version 2013.10.12
  */
 public abstract class Multiplex {
@@ -132,7 +132,6 @@ public abstract class Multiplex {
 			SocketChannel channel = socket.getChannel();
 			channel.configureBlocking(false);
 			channel.register(selector, SelectionKey.OP_READ);
-			//System.out.println("Got TCP connection from " + socket);
 		} catch (IOException e) {
 			System.err.println("Error on accepting connection " + socket);
 		}
@@ -245,14 +244,20 @@ public abstract class Multiplex {
 		}
 	}
 	
-	protected void send(Channel channel, ProtocolData protocolData) throws IOException {
-		ByteBuffer buffer = protocolData.toByteBuffer();
+	protected void send(Channel channel, ProtocolData data) throws IOException {
+		ByteBuffer buffer = data.toByteBuffer();
 		if (channel instanceof SocketChannel)
 			((SocketChannel) channel).write(buffer);
 		else if (channel instanceof DatagramChannel)
 			((DatagramChannel) channel).write(buffer);
 	}
 	
+	/**
+	 * Retorna uma string contendo os caracteres armazenados no buffer.
+	 * Para ser utilizado após o canal da entrada padrão estiver pronto
+	 * para leitura.
+	 * @return Uma string contendo os caracteres armazenados no buffer.
+	 */
 	protected String bufferToString() {
 		StringBuilder sb = new StringBuilder();
 		while (buffer.hasRemaining())
@@ -262,6 +267,10 @@ public abstract class Multiplex {
 		return sb.toString();
 	}
 	
+	/**
+	 * @return true se os dados contidos no buffer representam uma mensagem 
+	 * de protocolo, false caso contrário.
+	 */
 	protected boolean isProtocolData() {
 		if (buffer.limit() >= 5) {
 			StringBuilder sb = new StringBuilder();
@@ -270,5 +279,13 @@ public abstract class Multiplex {
 			return sb.toString().contentEquals("EP2P/");
 		}
 		return false;
+	}
+	
+	protected void cancelTimer(Timer timer) {
+		if (timer != null) {
+			timer.cancel();
+			timer.purge();
+			timer = null;
+		}
 	}
 }
