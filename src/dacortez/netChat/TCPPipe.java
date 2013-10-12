@@ -13,8 +13,8 @@ public class TCPPipe implements Pipe {
 	}
 	
 	@Override
-	public void send(ProtocolData data) throws IOException {
-		byte[] array = data.toByteArray();
+	public void send(ProtocolData protocolData) throws IOException {
+		byte[] array = protocolData.toByteArray();
 		DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 		out.write(array);
 		//System.out.println("Sent array.length = " + array.length + " / data.size = " + data.getSize());

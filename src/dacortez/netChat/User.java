@@ -1,13 +1,35 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
+/**
+ * Modela um usuário para o programa de bate-papo, conténdo
+ * informações sobre nome, username, senha, tipo de conexão,
+ * porta para conexão p2p e status de travamento (usuário
+ * batendo papo com outro usuario).
+ * 
+ * @author dacortez
+ * @version 2013.10.12
+ */
 public class User {
+	// Nome do usuário.
 	private String name;
+	// Username para efetuar login.
 	private String userName;
+	// Hash da senha do usuário.
 	private String passwordHash;
+	// Host do usuário para conexão.
 	private String host = null;
-	private ConnectionType type;
-	private boolean locked;
+	// Porta de conexão do usuário.
 	private Integer pierPort;
+	// Tipo de conexão que o usuário está utilzando.
+	private ConnectionType type;
+	// Status de travamento (usuário batendo papo com outro).
+	private boolean locked;
 	
 	public String getName() {
 		return name;
@@ -41,6 +63,14 @@ public class User {
 		this.host = host;
 	}
 	
+	public Integer getPierPort() {
+		return pierPort;
+	}
+
+	public void setPierPort(int pierPort) {
+		this.pierPort = pierPort;
+	}
+	
 	public ConnectionType getType() {
 		return type;
 	}
@@ -55,14 +85,6 @@ public class User {
 
 	public void setLocked(boolean locked) {
 		this.locked = locked;
-	}
-
-	public Integer getPierPort() {
-		return pierPort;
-	}
-
-	public void setPierPort(int pierPort) {
-		this.pierPort = pierPort;
 	}
 
 	public User(String name, String userName, String passwordHash) {

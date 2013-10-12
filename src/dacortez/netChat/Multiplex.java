@@ -1,3 +1,9 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.io.IOException;
@@ -18,16 +24,35 @@ import java.nio.channels.SocketChannel;
 import java.util.Set;
 import java.util.Timer;
 
+/**
+ * A classe Multiplex permite a multiplexação dos canais de rede
+ * TCP/UDP e da entrada padrão através de um seletor. 
+ * 
+ * @author Daniel Augusto Cortez
+ * @version 2013.10.12
+ */
 public abstract class Multiplex {
+	// Buffer para receber dados dos canais.
 	protected ByteBuffer buffer = ByteBuffer.allocate(10000);
-	protected SystemInPipe stdinPipe;
-	protected Selector selector;
+	// Canal para receber conexões TCP.
 	protected ServerSocketChannel serverSocketChannel;
+	// Cana para receber pacotes UDP.
 	protected DatagramChannel datagramChannel;
+	// Seletor onde os canais serão registrados.
+	protected Selector selector;
+	// Canal para entrada padrão.
 	protected SelectableChannel stdin;
+	// Pipe para entrada padrão.
+	protected SystemInPipe stdinPipe;
+	// Timer para ser utilizado na função de heart beat.
 	protected Timer timer;
-	protected SocketAddress address;
+
 	
+	/**
+	 * Inicializa o seletor, registra os canais de interesse e se mantém
+	 * na escuta deles, efetuando o tratamento apropriando quando qualquer
+	 * um deles estiver pronto.
+	 */
 	public void run() {
 		try {
 			selector = Selector.open();
@@ -52,7 +77,11 @@ public abstract class Multiplex {
 		// Por padrão não faz nada.
 	}
 	
+	// ------------------------------------------------------------------------
+	
 	protected abstract void registerChannelsWithSelector() throws IOException;
+	
+	// ------------------------------------------------------------------------
 	
 	protected void setServerSocketChannel(int port) throws IOException {
 		serverSocketChannel = ServerSocketChannel.open();
@@ -131,6 +160,9 @@ public abstract class Multiplex {
 		}
 	}
 	
+	// Armazena o endereço do pacote UDP recebido.
+	protected SocketAddress address;
+	
 	private void handleReadableUDP(SelectionKey key) {
 		DatagramChannel channel = null;
 		try {
@@ -164,7 +196,6 @@ public abstract class Multiplex {
 		channel.read(buffer);
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
-		//System.out.println("Read " + buffer.limit() + " from TCP " + channel);
 		return true;
 	}
 	
@@ -173,7 +204,6 @@ public abstract class Multiplex {
 		address = channel.receive(buffer);
 		buffer.flip();
 		if (buffer.limit() == 0) return false;
-		//System.out.println("Processed " + buffer.limit() + " from UDP " + channel);
 		return true;
 	}
 
@@ -182,7 +212,6 @@ public abstract class Multiplex {
         int count = channel.read(buffer);
         if (count <= 0) return false;
         buffer.flip();
-        //System.out.println ("Processed " + count + " from Stdin " + channel);
 		return true;
 	}
 	
@@ -203,9 +232,8 @@ public abstract class Multiplex {
 			socket = channel.socket();
 			socket.close();
 		} catch (IOException ie) {
-			System.err.println("Error closing socket " + socket + ": " + ie);
+			System.err.println("Erro ao fechar o socket " + socket + ": " + ie);
 		}
-		//System.out.println("Closed " + socket);
 	}
 	
 	protected void closeChannel(SelectionKey key, Channel channel) {
@@ -213,18 +241,16 @@ public abstract class Multiplex {
 		try {
 			channel.close();
 		} catch (IOException ie) {
-			System.err.println("Error closing channel " + channel + ": " + ie);
+			System.err.println("Erro ao fechar o canal " + channel + ": " + ie);
 		}
-		//System.out.println("Closed " + channel);
 	}
 	
-	protected void send(Channel channel, ProtocolData data) throws IOException {
-		ByteBuffer buffer = data.toByteBuffer();
+	protected void send(Channel channel, ProtocolData protocolData) throws IOException {
+		ByteBuffer buffer = protocolData.toByteBuffer();
 		if (channel instanceof SocketChannel)
 			((SocketChannel) channel).write(buffer);
 		else if (channel instanceof DatagramChannel)
 			((DatagramChannel) channel).write(buffer);
-		//System.out.println("Sent " + buffer.limit() + " from " + channel);
 	}
 	
 	protected String bufferToString() {

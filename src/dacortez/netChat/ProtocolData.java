@@ -5,21 +5,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ProtocolData {
-	private DataType type;
+	private ProtocolMessage message;
 	private List<String> header;
 	private byte[] data;
 	
-	public DataType getType() {
-		return type;
+	public ProtocolMessage getMessage() {
+		return message;
 	}
 	
 	public byte[] getData() {
 		return data;
 	}
 		
-	public ProtocolData(DataType type) {
+	public ProtocolData(ProtocolMessage type) {
 		header = new ArrayList<String>();
-		this.type = type;
+		this.message = type;
 	}
 	
 	public ProtocolData(ByteBuffer buffer) {
@@ -34,7 +34,7 @@ public class ProtocolData {
 		int i = 0;
 		while ((char) buffer.get(i) != '\r' && (char) buffer.get(i + 1) != '\n')
 			sb.append((char) buffer.get(i++));
-		type = selectDataType(new String(sb));
+		message = selectMessage(new String(sb));
 		return i + 2;
 	}
 
@@ -72,7 +72,7 @@ public class ProtocolData {
 		int i = 0;
 		while ((char) array[i] != '\r' && (char) array[i + 1] != '\n')
 			sb.append((char) array[i++]);
-		type = selectDataType(new String(sb));
+		message = selectMessage(new String(sb));
 		return i + 2;
 	}
 	
@@ -100,7 +100,7 @@ public class ProtocolData {
 	
 	public byte[] toByteArray() {
 		byte[] array = new byte[getSize()];
-		int i = appendLine(type.toString(), 0, array);
+		int i = appendLine(message.toString(), 0, array);
 		for (String line: header)
 			i = appendLine(line, i, array);
 		array[i++] = '\r'; array[i++] = '\n';
@@ -119,7 +119,7 @@ public class ProtocolData {
 	
 	public ByteBuffer toByteBuffer() {
 		ByteBuffer buffer = ByteBuffer.allocate(getSize());
-		int i = appendLine(type.toString(), 0, buffer);
+		int i = appendLine(message.toString(), 0, buffer);
 		for (String line: header)
 			i = appendLine(line, i, buffer);
 		buffer.put(i++, (byte) '\r'); buffer.put(i++, (byte) '\n');
@@ -138,7 +138,7 @@ public class ProtocolData {
 	}
 	
 	public int getSize() {
-		int size = type.toString().length() + 2;
+		int size = message.toString().length() + 2;
 		for (String line: header)
 			size += line.length() + 2;
 		size += 2;
@@ -175,64 +175,62 @@ public class ProtocolData {
 		data = newData;
 	}
 	
-	private DataType selectDataType(String value) {
-		if (value.contentEquals(DataType.CONNECTION_OK.toString()))
-			return DataType.CONNECTION_OK;
-		if (value.contentEquals(DataType.LOGIN_REQUEST.toString()))
-			return DataType.LOGIN_REQUEST;
-		if (value.contentEquals(DataType.LOGIN_OK.toString()))
-			return DataType.LOGIN_OK;
-		if (value.contentEquals(DataType.LOGIN_FAIL.toString()))
-			return DataType.LOGIN_FAIL;
-		if (value.contentEquals(DataType.USERS_REQUEST.toString()))
-			return DataType.USERS_REQUEST;
-		if (value.contentEquals(DataType.USERS_LIST.toString()))
-			return DataType.USERS_LIST;
-		if (value.contentEquals(DataType.LOGOUT_REQUEST.toString()))
-			return DataType.LOGOUT_REQUEST;
-		if (value.contentEquals(DataType.LOGOUT_OK.toString()))
-			return DataType.LOGOUT_OK;
-		if (value.contentEquals(DataType.CHAT_REQUEST.toString()))
-			return DataType.CHAT_REQUEST;
-		if (value.contentEquals(DataType.CHAT_OK.toString()))
-			return DataType.CHAT_OK;
-		if (value.contentEquals(DataType.CHAT_DENIED.toString()))
-			return DataType.CHAT_DENIED;
-		if (value.contentEquals(DataType.CHAT_MSG.toString()))
-			return DataType.CHAT_MSG;
-		if (value.contentEquals(DataType.CHAT_END.toString()))
-			return DataType.CHAT_END;
-		if (value.contentEquals(DataType.CHAT_FINISHED.toString()))
-			return DataType.CHAT_FINISHED;
-		if (value.contentEquals(DataType.TRANSFER_REQUEST.toString()))
-			return DataType.TRANSFER_REQUEST;
-		if (value.contentEquals(DataType.TRANSFER_OK.toString()))
-			return DataType.TRANSFER_OK;
-		if (value.contentEquals(DataType.TRANSFER_DENIED.toString()))
-			return DataType.TRANSFER_DENIED;
-		if (value.contentEquals(DataType.TRANSFER_START.toString()))
-			return DataType.TRANSFER_START;
-		if (value.contentEquals(DataType.FILE_DATA.toString()))
-			return DataType.FILE_DATA;
-		if (value.contentEquals(DataType.DATA_SAVED.toString()))
-			return DataType.DATA_SAVED;
-		if (value.contentEquals(DataType.SEND_AGAIN.toString()))
-			return DataType.SEND_AGAIN;
-		if (value.contentEquals(DataType.TRANSFER_END.toString()))
-			return DataType.TRANSFER_END;
-		if (value.contentEquals(DataType.HEART_BEAT.toString()))
-			return DataType.HEART_BEAT;
+	private ProtocolMessage selectMessage(String value) {
+		if (value.contentEquals(ProtocolMessage.CONNECTION_OK.toString()))
+			return ProtocolMessage.CONNECTION_OK;
+		if (value.contentEquals(ProtocolMessage.LOGIN_REQUEST.toString()))
+			return ProtocolMessage.LOGIN_REQUEST;
+		if (value.contentEquals(ProtocolMessage.LOGIN_OK.toString()))
+			return ProtocolMessage.LOGIN_OK;
+		if (value.contentEquals(ProtocolMessage.LOGIN_FAIL.toString()))
+			return ProtocolMessage.LOGIN_FAIL;
+		if (value.contentEquals(ProtocolMessage.USERS_REQUEST.toString()))
+			return ProtocolMessage.USERS_REQUEST;
+		if (value.contentEquals(ProtocolMessage.USERS_LIST.toString()))
+			return ProtocolMessage.USERS_LIST;
+		if (value.contentEquals(ProtocolMessage.LOGOUT_REQUEST.toString()))
+			return ProtocolMessage.LOGOUT_REQUEST;
+		if (value.contentEquals(ProtocolMessage.LOGOUT_OK.toString()))
+			return ProtocolMessage.LOGOUT_OK;
+		if (value.contentEquals(ProtocolMessage.CHAT_REQUEST.toString()))
+			return ProtocolMessage.CHAT_REQUEST;
+		if (value.contentEquals(ProtocolMessage.CHAT_OK.toString()))
+			return ProtocolMessage.CHAT_OK;
+		if (value.contentEquals(ProtocolMessage.CHAT_DENIED.toString()))
+			return ProtocolMessage.CHAT_DENIED;
+		if (value.contentEquals(ProtocolMessage.CHAT_MSG.toString()))
+			return ProtocolMessage.CHAT_MSG;
+		if (value.contentEquals(ProtocolMessage.CHAT_END.toString()))
+			return ProtocolMessage.CHAT_END;
+		if (value.contentEquals(ProtocolMessage.CHAT_FINISHED.toString()))
+			return ProtocolMessage.CHAT_FINISHED;
+		if (value.contentEquals(ProtocolMessage.TRANSFER_REQUEST.toString()))
+			return ProtocolMessage.TRANSFER_REQUEST;
+		if (value.contentEquals(ProtocolMessage.TRANSFER_OK.toString()))
+			return ProtocolMessage.TRANSFER_OK;
+		if (value.contentEquals(ProtocolMessage.TRANSFER_DENIED.toString()))
+			return ProtocolMessage.TRANSFER_DENIED;
+		if (value.contentEquals(ProtocolMessage.TRANSFER_START.toString()))
+			return ProtocolMessage.TRANSFER_START;
+		if (value.contentEquals(ProtocolMessage.FILE_DATA.toString()))
+			return ProtocolMessage.FILE_DATA;
+		if (value.contentEquals(ProtocolMessage.DATA_SAVED.toString()))
+			return ProtocolMessage.DATA_SAVED;
+		if (value.contentEquals(ProtocolMessage.SEND_AGAIN.toString()))
+			return ProtocolMessage.SEND_AGAIN;
+		if (value.contentEquals(ProtocolMessage.HEART_BEAT.toString()))
+			return ProtocolMessage.HEART_BEAT;
 		return null;
 	}
 	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder(); 
-		sb.append(type.toString()).append("\r\n");
+		sb.append(message.toString()).append("\r\n");
 		for (String line: header)
 			sb.append(line).append("\r\n");
 		sb.append("\r\n");
-		if (type == DataType.FILE_DATA)
+		if (message == ProtocolMessage.FILE_DATA)
 			sb.append(dataToString());
 		return sb.toString();
 	}

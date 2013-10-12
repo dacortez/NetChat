@@ -10,8 +10,8 @@ import javax.net.ssl.*;
 
 public class SslReverseEchoer {
 	public static void main(String[] args) {
-		String ksName = "herong.jks";
-		char ksPass[] = "HerongJKS".toCharArray();
+		String ksName = "dacortez.jks";
+		char ksPass[] = "foobar".toCharArray();
 		char ctPass[] = "My1stKey".toCharArray();
 		try {
 			KeyStore ks = KeyStore.getInstance("JKS");

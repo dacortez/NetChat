@@ -32,11 +32,11 @@ public class UDPClient extends Client {
 		int limit = buffer.limit();
 		if (totalWritten + limit < totalSize) {
 			writeNextBlock(limit);
-			send(channel, new ProtocolData(DataType.DATA_SAVED));
+			send(channel, new ProtocolData(ProtocolMessage.DATA_SAVED));
 		}
 		else {
 			writeFinalBlock();
-			send(channel, new ProtocolData(DataType.DATA_SAVED));
+			send(channel, new ProtocolData(ProtocolMessage.DATA_SAVED));
 			transferEndReceiver();
 		}
 	}		

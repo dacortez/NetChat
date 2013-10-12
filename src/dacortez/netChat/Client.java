@@ -48,10 +48,10 @@ public abstract class Client extends Multiplex {
 	}
 	
 	public void start() throws IOException {
-		ProtocolData connectionOK = new ProtocolData(DataType.CONNECTION_OK);
+		ProtocolData connectionOK = new ProtocolData(ProtocolMessage.CONNECTION_OK);
 		serverPipe.send(connectionOK);
 		ProtocolData received = serverPipe.receive();
-		if (received.getType() == DataType.CONNECTION_OK)
+		if (received.getMessage() == ProtocolMessage.CONNECTION_OK)
 			doLogin();
 		serverPipe.close();		
 	}
@@ -63,7 +63,7 @@ public abstract class Client extends Multiplex {
 			@Override
 			public void run() {
 				try {
-					ProtocolData heartBeat = new ProtocolData(DataType.HEART_BEAT);
+					ProtocolData heartBeat = new ProtocolData(ProtocolMessage.HEART_BEAT);
 					serverPipe.send(heartBeat);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -75,12 +75,12 @@ public abstract class Client extends Multiplex {
 	protected void doLogin() throws IOException {
 		serverPipe.send(loginRequest());
 		ProtocolData received = serverPipe.receive();
-		if (received.getType() == DataType.LOGIN_OK) {
+		if (received.getMessage() == ProtocolMessage.LOGIN_OK) {
 			System.out.println("Bem-vindo ao servidor de Chat!");
 			printMenu();
 			run();
 		}
-		else if (received.getType() == DataType.LOGIN_FAIL) {
+		else if (received.getMessage() == ProtocolMessage.LOGIN_FAIL) {
 			System.out.println("Login inválido! Até a próxima...");
 			cancelTimer(timer);
 		}
@@ -93,7 +93,7 @@ public abstract class Client extends Multiplex {
 		userName = inFromUser.readLine().toLowerCase();
 		System.out.print("Password: ");
 		String password = inFromUser.readLine();
-		ProtocolData loginRequest = new ProtocolData(DataType.LOGIN_REQUEST);
+		ProtocolData loginRequest = new ProtocolData(ProtocolMessage.LOGIN_REQUEST);
 		loginRequest.addToHeader(userName);
 		loginRequest.addToHeader(password);
 		loginRequest.addToHeader(pierPort.toString());
@@ -149,7 +149,7 @@ public abstract class Client extends Multiplex {
 			System.out.println("O usuário não deve ser você mesmo!");
 			return null;
 		}
-		ProtocolData chatRequest = new ProtocolData(DataType.CHAT_REQUEST);
+		ProtocolData chatRequest = new ProtocolData(ProtocolMessage.CHAT_REQUEST);
 		chatRequest.addToHeader(requested); // requested
 		chatRequest.addToHeader(this.userName); // sender
 		return chatRequest;
@@ -157,11 +157,11 @@ public abstract class Client extends Multiplex {
 
 	private void serverResponseFromChatRequest() throws IOException {
 		ProtocolData received = serverPipe.receive();
-		if (received.getType() == DataType.CHAT_DENIED) {
+		if (received.getMessage() == ProtocolMessage.CHAT_DENIED) {
 			System.out.println("Bate-papo negado: " + received.getHeaderLine(0));
 			printMenu();
 		}
-		else if (received.getType() == DataType.CHAT_OK)
+		else if (received.getMessage() == ProtocolMessage.CHAT_OK)
 			chatOKFromServer(received);
 	}
 
@@ -190,14 +190,14 @@ public abstract class Client extends Multiplex {
 			return null;
 		if (msg.contentEquals("q()"))
 			return chatFinished();
-		ProtocolData chatMsg = new ProtocolData(DataType.CHAT_MSG);
+		ProtocolData chatMsg = new ProtocolData(ProtocolMessage.CHAT_MSG);
 		chatMsg.addToHeader(this.userName); 
 		chatMsg.addToHeader(msg); 
 		return chatMsg;
 	}
 	
 	private ProtocolData chatFinished() throws IOException {
-		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
+		ProtocolData chatEnd = new ProtocolData(ProtocolMessage.CHAT_END);
 		chatEnd.addToHeader(userName);
 		serverPipe.send(chatEnd);
 		return serverPipe.receive();
@@ -247,7 +247,7 @@ public abstract class Client extends Multiplex {
 			return null;
 		}
 		else {
-			ProtocolData transferRequest = new ProtocolData(DataType.TRANSFER_REQUEST);
+			ProtocolData transferRequest = new ProtocolData(ProtocolMessage.TRANSFER_REQUEST);
 			transferRequest.addToHeader(receiver);
 			transferRequest.addToHeader(this.userName);
 			return transferRequest;
@@ -256,10 +256,10 @@ public abstract class Client extends Multiplex {
 	
 	private void serverResponseFromTransferRequest() throws IOException {
 		ProtocolData received = serverPipe.receive();
-		if (received.getType() == DataType.TRANSFER_OK) {
+		if (received.getMessage() == ProtocolMessage.TRANSFER_OK) {
 			transferOKFromServer(received);
 		}
-		else if (received.getType() == DataType.TRANSFER_DENIED) {
+		else if (received.getMessage() == ProtocolMessage.TRANSFER_DENIED) {
 			System.out.println("Transferencia negada: " + received.getHeaderLine(0));
 			printMenu();
 		}
@@ -281,7 +281,7 @@ public abstract class Client extends Multiplex {
 		System.out.println(sendFile.getName() + ">>" + receiver + "@" + host + ":" + receiverPierPort.toString());		
 		p2pInstantiation(receiverHost, receiverPierPort);
 		p2pPipe.send(transferOK);
-		if (p2pPipe.receive().getType() == DataType.TRANSFER_START)
+		if (p2pPipe.receive().getMessage() == ProtocolMessage.TRANSFER_START)
 			transferStart();
 	}
 	
@@ -391,9 +391,9 @@ public abstract class Client extends Multiplex {
 
 	private void listUsers() {
 		try {
-			serverPipe.send(new ProtocolData(DataType.USERS_REQUEST));
+			serverPipe.send(new ProtocolData(ProtocolMessage.USERS_REQUEST));
 			ProtocolData received = serverPipe.receive();
-			if (received.getType() == DataType.USERS_LIST) {
+			if (received.getMessage() == ProtocolMessage.USERS_LIST) {
 				System.out.println("Lista de usuários logados:");
 				int num = received.getNumberOfHeaderLines();
 				for (int i = 0; i < num; i++)
@@ -406,11 +406,11 @@ public abstract class Client extends Multiplex {
 	
 	private boolean logout() {
 		try {
-			ProtocolData logoutRequest = new ProtocolData(DataType.LOGOUT_REQUEST);
+			ProtocolData logoutRequest = new ProtocolData(ProtocolMessage.LOGOUT_REQUEST);
 			logoutRequest.addToHeader(userName);
 			serverPipe.send(logoutRequest);
 			ProtocolData received = serverPipe.receive();
-			if (received.getType() == DataType.LOGOUT_OK) {
+			if (received.getMessage() == ProtocolMessage.LOGOUT_OK) {
 				System.out.println("Até a próxima...");
 				cancelTimer(timer);
 				return true;
@@ -450,19 +450,19 @@ public abstract class Client extends Multiplex {
 			return;
 		}
 		received = new ProtocolData(buffer);
-		if (received.getType() == DataType.CHAT_OK) {
+		if (received.getMessage() == ProtocolMessage.CHAT_OK) {
 			chatOKFromPier(received);
 		}
-		else if (received.getType() == DataType.CHAT_MSG) {
+		else if (received.getMessage() == ProtocolMessage.CHAT_MSG) {
 			chatMsg(received);
 		}
-		else if (received.getType() == DataType.CHAT_FINISHED) {
+		else if (received.getMessage() == ProtocolMessage.CHAT_FINISHED) {
 			chatFinished(channel);
 		}
-		else if (received.getType() == DataType.CHAT_END) {
+		else if (received.getMessage() == ProtocolMessage.CHAT_END) {
 			chatEnd(channel);
 		}
-		else if (received.getType() == DataType.TRANSFER_OK) {
+		else if (received.getMessage() == ProtocolMessage.TRANSFER_OK) {
 			transferOKFromPier(channel, received);
 		}
 	}
@@ -534,10 +534,10 @@ public abstract class Client extends Multiplex {
 	
 	protected void chatFinished(Channel channel) throws IOException {
 		closeIfSocketChannel(channel);
-		ProtocolData chatEnd = new ProtocolData(DataType.CHAT_END);
+		ProtocolData chatEnd = new ProtocolData(ProtocolMessage.CHAT_END);
 		chatEnd.addToHeader(userName);
 		serverPipe.send(chatEnd);
-		if (serverPipe.receive().getType() == DataType.CHAT_FINISHED) {
+		if (serverPipe.receive().getMessage() == ProtocolMessage.CHAT_FINISHED) {
 			p2pPipe.send(chatEnd);
 			p2pPipe.close();
 			System.out.println("Bate-papo-finalizado!");
@@ -587,7 +587,7 @@ public abstract class Client extends Multiplex {
 		filesReceived = 0;
 		state = ClientState.TRANSFERING;
 		System.out.println("Recebendo arquivo de " + sender + "@" + senderHost + ":" + senderPierPort);
-		ProtocolData transferStart = new ProtocolData(DataType.TRANSFER_START);
+		ProtocolData transferStart = new ProtocolData(ProtocolMessage.TRANSFER_START);
 		send(channel, transferStart);	
 	}
 }

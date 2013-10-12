@@ -1,3 +1,9 @@
+/**
+ * MAC0448 - Programação para Redes - EP2
+ * Daniel Augusto Cortez - 2960291
+ * 
+ */
+
 package dacortez.netChat;
 
 import java.io.IOException;
@@ -43,25 +49,25 @@ public class Server extends Multiplex {
 		System.out.println("Server listening UDP on port " + port + ".");
 		System.out.println("Press Ctrl+C to close.");
 	}
-	
+		
 	@Override
 	protected void respond(Channel channel) throws IOException {
 		ProtocolData received = new ProtocolData(buffer);
-		if (received.getType() == DataType.CONNECTION_OK)
+		if (received.getMessage() == ProtocolMessage.CONNECTION_OK)
 			connectionOK(channel, received);
-		else if (received.getType() == DataType.LOGIN_REQUEST)
+		else if (received.getMessage() == ProtocolMessage.LOGIN_REQUEST)
 			loginRequest(channel, received);
-		else if (received.getType() == DataType.USERS_REQUEST)
+		else if (received.getMessage() == ProtocolMessage.USERS_REQUEST)
 			usersRequest(channel);
-		else if (received.getType() == DataType.CHAT_REQUEST)
+		else if (received.getMessage() == ProtocolMessage.CHAT_REQUEST)
 			chatRequest(channel, received);
-		else if (received.getType() == DataType.CHAT_END)
+		else if (received.getMessage() == ProtocolMessage.CHAT_END)
 			chatEnd(channel, received);
-		else if (received.getType() == DataType.TRANSFER_REQUEST)
+		else if (received.getMessage() == ProtocolMessage.TRANSFER_REQUEST)
 			transferRequest(channel, received);
-		else if (received.getType() == DataType.LOGOUT_REQUEST)
+		else if (received.getMessage() == ProtocolMessage.LOGOUT_REQUEST)
 			logoutRequest(channel, received);
-		else if (received.getType() == DataType.HEART_BEAT)
+		else if (received.getMessage() == ProtocolMessage.HEART_BEAT)
 			heartBeat();
 	}
 	
@@ -75,9 +81,9 @@ public class Server extends Multiplex {
 
 	private void loginRequest(Channel channel, ProtocolData loginRequest) throws IOException {
 		if (logInUser(channel, loginRequest))			
-			send(channel, new ProtocolData(DataType.LOGIN_OK));
+			send(channel, new ProtocolData(ProtocolMessage.LOGIN_OK));
 		else
-			send(channel, new ProtocolData(DataType.LOGIN_FAIL));
+			send(channel, new ProtocolData(ProtocolMessage.LOGIN_FAIL));
 	}
 	
 	private boolean logInUser(Channel channel, ProtocolData loginRequest) {
@@ -122,7 +128,7 @@ public class Server extends Multiplex {
 	// USERS_REQUEST ------------------------------------------------------------------------------
 	
 	private void usersRequest(Channel channel) throws IOException {
-		ProtocolData usersList = new ProtocolData(DataType.USERS_LIST);
+		ProtocolData usersList = new ProtocolData(ProtocolMessage.USERS_LIST);
 		for (User user: loggedInUsers)
 			usersList.addToHeader(user.toString());
 		send(channel, usersList);
@@ -136,14 +142,14 @@ public class Server extends Multiplex {
 		if (requested != null)
 			checkConnectionAndLockForChat(channel, requested, sender);
 		else {
-			ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
+			ProtocolData chatDenied = new ProtocolData(ProtocolMessage.CHAT_DENIED);
 			chatDenied.addToHeader("usuario nao conectado");
 			send(channel, chatDenied);
 		}
 	}
 
 	private void checkConnectionAndLockForChat(Channel channel, User requested, User sender) throws IOException {
-		ProtocolData chatDenied = new ProtocolData(DataType.CHAT_DENIED);
+		ProtocolData chatDenied = new ProtocolData(ProtocolMessage.CHAT_DENIED);
 		if (isConnectionRight(channel, requested.getType())) {
 			if (!requested.isLocked()) {
 				requested.setLocked(true); 
@@ -170,7 +176,7 @@ public class Server extends Multiplex {
 	}
 
 	private ProtocolData chatOK(User requested, User sender) throws IOException {
-		ProtocolData chatOK = new ProtocolData(DataType.CHAT_OK);
+		ProtocolData chatOK = new ProtocolData(ProtocolMessage.CHAT_OK);
 		chatOK.addToHeader(requested.getHost());
 		chatOK.addToHeader(requested.getPierPort().toString());
 		chatOK.addToHeader(sender.getHost());
@@ -183,7 +189,7 @@ public class Server extends Multiplex {
 	private void chatEnd(Channel channel, ProtocolData chatEnd) throws IOException {
 		User user = getLoggedUser(chatEnd.getHeaderLine(0));
 		user.setLocked(false);
-		ProtocolData chatFinished = new ProtocolData(DataType.CHAT_FINISHED);
+		ProtocolData chatFinished = new ProtocolData(ProtocolMessage.CHAT_FINISHED);
 		chatFinished.addToHeader(user.getUserName());
 		send(channel, chatFinished);
 	}
@@ -197,14 +203,14 @@ public class Server extends Multiplex {
 			checkConnectionAndLockForTransfer(channel, receiver, sender);
 		} 
 		else {
-			ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
+			ProtocolData transferDenied = new ProtocolData(ProtocolMessage.TRANSFER_DENIED);
 			transferDenied.addToHeader("usuario nao conectado");
 			send(channel, transferDenied);
 		}
 	}
 	
 	private void checkConnectionAndLockForTransfer(Channel channel, User requested, User sender) throws IOException {
-		ProtocolData transferDenied = new ProtocolData(DataType.TRANSFER_DENIED);
+		ProtocolData transferDenied = new ProtocolData(ProtocolMessage.TRANSFER_DENIED);
 		if (isConnectionRight(channel, requested.getType())) {
 			if (!requested.isLocked()) {
 				send(channel, transferOK(requested, sender));
@@ -221,7 +227,7 @@ public class Server extends Multiplex {
 	}
 
 	private ProtocolData transferOK(User receiver, User sender) {
-		ProtocolData transferOK = new ProtocolData(DataType.TRANSFER_OK);
+		ProtocolData transferOK = new ProtocolData(ProtocolMessage.TRANSFER_OK);
 		transferOK.addToHeader(receiver.getUserName());
 		transferOK.addToHeader(receiver.getHost());
 		transferOK.addToHeader(receiver.getPierPort().toString());
@@ -237,7 +243,7 @@ public class Server extends Multiplex {
 		User user = getLoggedUser(logoutRequest.getHeaderLine(0));
 		if (user != null)
 			loggedInUsers.remove(user);
-		send(channel, new ProtocolData(DataType.LOGOUT_OK));
+		send(channel, new ProtocolData(ProtocolMessage.LOGOUT_OK));
 	}
 	
 	// HEART_BEAT ---------------------------------------------------------------------------------

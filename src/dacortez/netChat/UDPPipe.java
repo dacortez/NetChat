@@ -19,8 +19,8 @@ public class UDPPipe implements Pipe {
 	}
 	
 	@Override
-	public void send(ProtocolData data) throws IOException {
-		byte[]  array = data.toByteArray();
+	public void send(ProtocolData protocolData) throws IOException {
+		byte[]  array = protocolData.toByteArray();
 		DatagramPacket packet = new DatagramPacket(array, array.length, inet, port);
 		socket.send(packet); 
 	}
